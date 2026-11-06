@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slow Progressive Chain // 14.22</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: #000;
+      color: #0f0;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 12px;
+    }
+    a { color: #0af; text-decoration: none; }
+    a:hover { color: #fff; }
+    .controls { margin: 10px 0; }
+    button {
+      background: #050505;
+      border: 1px solid #0a0;
+      color: #0f0;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 14px;
+      margin: 0 6px 6px 0;
+      cursor: pointer;
+    }
+    button:hover { border-color: #0f0; color: #fff; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    #log {
+      flex: 1;
+      background: #020202;
+      border: 1px solid #030;
+      padding: 10px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 12.5px;
+    }
+    .ok { color: #0f0; }
+    .fail { color: #f33; }
+    .info { color: #0af; }
+    .warn { color: #fa0; }
+    .dim { color: #060; }
+    .hdr { color: #0f0; }
+    .stage { color: #0ff; }
+    #status {
+      font-size: 12px;
+      color: #0a0;
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div>
+      <a href="index.html">&lt;&lt; BACK</a>
+      &nbsp; SLOW PROGRESSIVE CHAIN — ramp like old reliability loaders
+    </div>
+
+    <div class="controls">
+      <button id="btnStart" onclick="startSlowChain()">START SLOW CHAIN</button>
+      <button id="btnStop" onclick="stopChain()" disabled>STOP</button>
+      <button onclick="clearLog()">Clear</button>
+    </div>
+
+    <div id="status">idle</div>
+    <div id="log">[*] Slow progressive chain ready.\n[*] This ramps memory + remaining features stage-by-stage with delays,\n[*] similar to old loaders that slowly fed data until the chain stabilized.\n[*] It will NOT produce a jailbreak on 14.22 — it is a reliability / side-effect probe.\n</div>
+  </div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    const statusEl = document.getElementById('status');
+    const btnStart = document.getElementById('btnStart');
+    const btnStop = document.getElementById('btnStop');
+
+    let running = false;
+    let held = [];          // keep some allocations alive across stages
+    let stage = 0;
+
+    function log(msg, cls) {
+      const line = document.createElement('div');
+      if (cls) line.className = cls;
+      line.textContent = msg;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+      try { console.log(msg); } catch(e){}
+    }
+    function clearLog() { logEl.innerHTML = ''; }
+    function setStatus(s) { statusEl.textContent = s; }
+
+    function sleep(ms) {
+      return new Promise(r => setTimeout(r, ms));
+    }
+
+    function stopChain() {
+      running = false;
+      btnStart.disabled = false;
+      btnStop.disabled = true;
+      setStatus('stopped at stage ' + stage);
+      log('[*] STOP requested', 'warn');
+    }
+
+    async function startSlowChain() {
+      if (running) return;
+      running = true;
+      btnStart.disabled = true;
+      btnStop.disabled = false;
+      held = [];
+      stage = 0;
+
+      clearLog();
+      log('[*] ===== SLOW PROGRESSIVE CHAIN =====', 'hdr');
+      log('[*] Target: 14.22 | style: old slow-ramp loaders', 'dim');
+      log('[*] Remaining primitives: Atomics, BigInt64Array, createImageBitmap, isSecureContext', 'dim');
+      log('');
+
+      try {
+        // ---------- STAGE 0 : environment ----------
+        stage = 0;
+        setStatus('stage 0 — environment');
+        log('[STAGE 0] Environment check', 'stage');
+        log(window.isSecureContext ? '[+] isSecureContext = true' : '[-] isSecureContext = false',
+            window.isSecureContext ? 'ok' : 'fail');
+        log('[+] Atomics: ' + (typeof Atomics !== 'undefined'), typeof Atomics !== 'undefined' ? 'ok' : 'fail');
+        log('[+] BigInt64Array: ' + (typeof BigInt64Array !== 'undefined'), typeof BigInt64Array !== 'undefined' ? 'ok' : 'fail');
+        log('[+] createImageBitmap: ' + (typeof createImageBitmap !== 'undefined'), typeof createImageBitmap !== 'undefined' ? 'ok' : 'fail');
+        await sleep(600);
+        if (!running) return;
+
+        // ---------- STAGE 1 : tiny warm-up ----------
+        stage = 1;
+        setStatus('stage 1 — tiny warm-up');
+        log('');
+        log('[STAGE 1] Tiny warm-up allocations (1–8 MB)', 'stage');
+        for (const mb of [1, 2, 4, 8]) {
+          if (!running) return;
+          try {
+            const b = new ArrayBuffer(mb * 1024 * 1024);
+            const v = new Uint8Array(b);
+            v[0] = 1; v[v.length-1] = 2;
+            held.push(b);
+            log('  [+] ' + mb + ' MB held (total buffers: ' + held.length + ')', 'ok');
+          } catch (e) {
+            log('  [-] ' + mb + ' MB failed: ' + e.message, 'fail');
+          }
+          await sleep(350);
+        }
+
+        // ---------- STAGE 2 : BigInt64 views on held memory ----------
+        stage = 2;
+        setStatus('stage 2 — BigInt64 views');
+        log('');
+        log('[STAGE 2] Attach BigInt64Array views to held buffers', 'stage');
+        let viewCount = 0;
+        for (let i = 0; i < held.length; i++) {
+          if (!running) return;
+          try {
+            const view = new BigInt64Array(held[i]);
+            view[0] = BigInt(0x43484149 + i); // "CHAI" + i
+            viewCount++;
+            log('  [+] view on buffer ' + i + ' OK', 'ok');
+          } catch (e) {
+            log('  [-] view ' + i + ' failed: ' + e.message, 'fail');
+          }
+          await sleep(200);
+        }
+        log('[*] BigInt64 views created: ' + viewCount, 'info');
+
+        // ---------- STAGE 3 : Atomics noise ----------
+        stage = 3;
+        setStatus('stage 3 — Atomics');
+        log('');
+        log('[STAGE 3] Atomics probes (expect reject on non-shared)', 'stage');
+        try {
+          const ab = new ArrayBuffer(64);
+          const i32 = new Int32Array(ab);
+          i32[0] = 0x59;
+          try {
+            Atomics.add(i32, 0, 1);
+            log('  [!] Atomics.add on non-shared succeeded (unexpected)', 'warn');
+          } catch (e) {
+            log('  [+] Atomics rejected non-shared: ' + e.name, 'ok');
+          }
+          log('  [+] Atomics methods: ' + Object.getOwnPropertyNames(Atomics).join(', '), 'dim');
+        } catch (e) {
+          log('  [-] Atomics section error: ' + e, 'fail');
+        }
+        await sleep(500);
+        if (!running) return;
+
+        // ---------- STAGE 4 : slow memory ramp toward known ceiling ----------
+        stage = 4;
+        setStatus('stage 4 — slow ramp toward ceiling');
+        log('');
+        log('[STAGE 4] Slow ramp (16 → 48 → 96 → 160 → 240 → 320 → 384 MB)', 'stage');
+        log('[*] Your earlier ceiling was ~384 MB. We stop at first failure.', 'dim');
+
+        const ramp = [16, 48, 96, 160, 240, 320, 384];
+        for (const mb of ramp) {
+          if (!running) return;
+          log('  [ ] allocating ' + mb + ' MB ...', 'dim');
+          await sleep(80); // let the log paint
+          try {
+            const b = new ArrayBuffer(mb * 1024 * 1024);
+            const v = new BigInt64Array(b);
+            v[0] = 0xDEADBEEFn;
+            v[v.length - 1] = 0xC0FFEEFn;
+            held.push(b);
+            log('  [+] ' + mb + ' MB OK — held total ~' + held.length + ' buffers', 'ok');
+          } catch (e) {
+            log('  [-] ' + mb + ' MB FAIL: ' + e.message, 'fail');
+            log('[*] Ramp stopped. Last successful stage allocation before this failed.', 'warn');
+            break;
+          }
+          // longer pause between bigger allocs, like old slow loaders
+          await sleep(600 + mb * 2);
+        }
+
+        if (!running) return;
+
+        // ---------- STAGE 5 : createImageBitmap side-effect ----------
+        stage = 5;
+        setStatus('stage 5 — ImageBitmap side-effect');
+        log('');
+        log('[STAGE 5] createImageBitmap visual / side-effect', 'stage');
+        try {
+          const c = document.createElement('canvas');
+          c.width = 128; c.height = 32;
+          const ctx = c.getContext('2d');
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, 128, 32);
+          ctx.fillStyle = '#0f0';
+          ctx.font = '14px monospace';
+          ctx.fillText('SLOW-CHAIN OK', 6, 20);
+
+          const bmp = await createImageBitmap(c);
+          log('  [+] createImageBitmap OK (' + bmp.width + 'x' + bmp.height + ')', 'ok');
+          if (bmp.close) bmp.close();
+        } catch (e) {
+          log('  [-] createImageBitmap failed: ' + e, 'fail');
+        }
+        await sleep(400);
+        if (!running) return;
+
+        // ---------- STAGE 6 : console / error surface ----------
+        stage = 6;
+        setStatus('stage 6 — console surface');
+        log('');
+        log('[STAGE 6] Force console + recoverable error surface', 'stage');
+        try {
+          console.log('[SLOW-CHAIN] stage 6 marker');
+          console.warn('[SLOW-CHAIN] warn marker');
+          console.error('[SLOW-CHAIN] error marker');
+          log('  [+] console.log/warn/error fired', 'ok');
+        } catch (e) {
+          log('  [-] console.* failed: ' + e, 'fail');
+        }
+        try {
+          null.f();
+        } catch (e) {
+          log('  [+] caught deliberate TypeError: ' + e.message, 'ok');
+        }
+        await sleep(400);
+
+        // ---------- STAGE 7 : hold + soft retry loop ----------
+        stage = 7;
+        setStatus('stage 7 — soft retry loop');
+        log('');
+        log('[STAGE 7] Soft retry loop (re-touch held memory + small new allocs)', 'stage');
+        log('[*] This mimics old loaders that kept gently re-trying until stable.', 'dim');
+
+        for (let round = 1; round <= 5 && running; round++) {
+          log('  -- retry round ' + round + '/5 --', 'info');
+          // re-touch existing
+          for (let i = 0; i < Math.min(held.length, 8); i++) {
+            try {
+              const v = new Uint8Array(held[i]);
+              v[0] = (v[0] + 1) & 0xff;
+            } catch (e) {}
+          }
+          // one small fresh alloc
+          try {
+            const b = new ArrayBuffer(2 * 1024 * 1024);
+            const v = new BigInt64Array(b);
+            v[0] = BigInt(round);
+            held.push(b);
+            log('    [+] round ' + round + ' extra 2 MB OK (held=' + held.length + ')', 'ok');
+          } catch (e) {
+            log('    [-] round ' + round + ' extra alloc failed: ' + e.message, 'fail');
+          }
+          await sleep(700);
+        }
+
+        // ---------- done ----------
+        log('');
+        log('[*] ===== SLOW CHAIN FINISHED =====', 'hdr');
+        log('[*] Held buffers at end: ' + held.length, 'info');
+        log('[*] Watch for any debug overlay, freeze, or unexpected UI during the run.', 'warn');
+        log('[*] Nothing here is a jailbreak — pure progressive pressure + side-effect probe.', 'dim');
+        setStatus('finished — held ' + held.length + ' buffers');
+
+      } catch (e) {
+        log('[!] Uncaught error in chain: ' + e, 'fail');
+        setStatus('error at stage ' + stage);
+      } finally {
+        running = false;
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+      }
+    }
+  </script>
+</body>
+</html>

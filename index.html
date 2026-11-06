@@ -98,19 +98,19 @@
     </div>
 
     <div class="menu">
-      <a class="btn" href="#" onclick="runQuickScan(); return false;"><span>[1]</span> QUICK SCAN + BASELINE</a>
+      <a class="btn" href="#" onclick="runQuickScan(); return false;"><span>[1]</span> QUICK SCAN</a>
       <a class="btn" href="#" onclick="runDeepRemaining(); return false;"><span>[2]</span> DEEP CHECK</a>
-      <a class="btn" href="chain.html"><span>[3]</span> CHAIN (combine still-alive)</a>
-      <a class="btn" href="webkit-sniff.html"><span>[4]</span> Full Sniff</a>
-      <a class="btn" href="alloc-pressure.html"><span>[5]</span> Alloc Pressure</a>
-      <a class="btn" href="typedarray-edge.html"><span>[6]</span> TypedArray Edge</a>
-      <a class="btn" href="iframe-sandbox.html"><span>[7]</span> iframe</a>
+      <a class="btn" href="chain.html"><span>[3]</span> CHAIN</a>
+      <a class="btn" href="slow-chain.html"><span>[4]</span> SLOW CHAIN</a>
+      <a class="btn" href="webkit-sniff.html"><span>[5]</span> Full Sniff</a>
+      <a class="btn" href="alloc-pressure.html"><span>[6]</span> Alloc Pressure</a>
+      <a class="btn" href="typedarray-edge.html"><span>[7]</span> TypedArray Edge</a>
       <a class="btn" href="notes.html"><span>[8]</span> Notes</a>
     </div>
 
     <div class="results">
-      <div class="results-title">// VULNERABILITY / FEATURE RESULTS</div>
-      <div id="log">[*] Ready. Run [1] / [2] or open [3] CHAIN to combine remaining features.\n</div>
+      <div class="results-title">// RESULTS</div>
+      <div id="log">[*] Ready.\n[*] [4] SLOW CHAIN = progressive ramp like old reliability loaders.\n</div>
     </div>
   </div>
 
@@ -126,15 +126,9 @@
     function clearLog() { logEl.innerHTML = ''; }
 
     const BASELINE_14_22 = {
-      'Atomics': true,
-      'BigInt64Array': true,
-      'createImageBitmap': true,
-      'isSecureContext': true,
-      'WebAssembly': false,
-      'SharedArrayBuffer': false,
-      'performance.memory': false,
-      'OffscreenCanvas': false,
-      'crossOriginIsolated': false
+      'Atomics': true, 'BigInt64Array': true, 'createImageBitmap': true, 'isSecureContext': true,
+      'WebAssembly': false, 'SharedArrayBuffer': false, 'performance.memory': false,
+      'OffscreenCanvas': false, 'crossOriginIsolated': false
     };
 
     function detect() {
@@ -153,137 +147,26 @@
 
     function runQuickScan() {
       clearLog();
-      log('[*] Quick Scan + 14.22 Baseline Comparison', 'info');
-      log('[*] ' + new Date().toISOString(), 'dim');
-      log('');
-
-      const ua = navigator.userAgent || '';
-      log('[+] userAgent: ' + ua, 'ok');
-      const wk = ua.match(/AppleWebKit\/([\d.]+)/);
-      log(wk ? '[+] WebKit token: ' + wk[0] : '[-] No AppleWebKit token', wk ? 'ok' : 'fail');
-      log('');
-
+      log('[*] Quick Scan + 14.22 Baseline', 'info');
       const current = detect();
-
-      log('=== ALIVE / DEAD vs known 14.22 baseline ===', 'hdr');
-      log('');
-      log('-- Still present on 14.22 --', 'info');
-      ['Atomics', 'BigInt64Array', 'createImageBitmap', 'isSecureContext'].forEach(name => {
-        const now = current[name];
-        if (now) log('  [+] ' + name + '  (matches baseline)', 'ok');
-        else log('  [-] ' + name + '  MISSING (was present on baseline)', 'fail');
+      log('-- Still present --', 'info');
+      ['Atomics','BigInt64Array','createImageBitmap','isSecureContext'].forEach(n => {
+        log((current[n]?'  [+] ':'  [-] ') + n, current[n]?'ok':'fail');
       });
-
-      log('');
-      log('-- Removed / missing on 14.22 --', 'info');
-      ['WebAssembly', 'SharedArrayBuffer', 'performance.memory', 'OffscreenCanvas', 'crossOriginIsolated'].forEach(name => {
-        const now = current[name];
-        if (!now) log('  [-] ' + name + '  (correctly missing)', 'fail');
-        else log('  [!] ' + name + '  PRESENT (unexpected vs baseline)', 'warn');
+      log('-- Missing --', 'info');
+      ['WebAssembly','SharedArrayBuffer','performance.memory','OffscreenCanvas','crossOriginIsolated'].forEach(n => {
+        log((!current[n]?'  [-] ':'  [!] ') + n, !current[n]?'fail':'warn');
       });
-
-      log('');
-      log('[*] Summary:', 'info');
-      const alive = Object.keys(current).filter(k => current[k]);
-      const dead  = Object.keys(current).filter(k => !current[k]);
-      log('  Alive : ' + alive.join(', '), 'ok');
-      log('  Dead  : ' + dead.join(', '), 'fail');
-      log('');
-      log('[*] No public 14.22 chain known. Report real findings via HackerOne.', 'warn');
     }
 
     function runDeepRemaining() {
       clearLog();
-      log('[*] Deep checks on features still present on 14.22', 'info');
-      log('');
-
-      log('=== Atomics ===', 'hdr');
-      if (typeof Atomics === 'undefined') {
-        log('[-] Atomics missing', 'fail');
-      } else {
-        try {
-          const buf = new ArrayBuffer(16);
-          const i32 = new Int32Array(buf);
-          i32[0] = 42;
-          try {
-            Atomics.add(i32, 0, 1);
-            log('[!] Atomics.add on non-shared buffer succeeded (unexpected)', 'warn');
-          } catch (e) {
-            log('[+] Atomics correctly rejects non-shared buffer: ' + e.name, 'ok');
-          }
-          log('[+] Atomics methods: ' + Object.getOwnPropertyNames(Atomics).join(', '), 'ok');
-        } catch (e) {
-          log('[-] Atomics test error: ' + e, 'fail');
-        }
-      }
-
-      log('');
-      log('=== BigInt64Array ===', 'hdr');
-      if (typeof BigInt64Array === 'undefined') {
-        log('[-] BigInt64Array missing', 'fail');
-      } else {
-        try {
-          const a = new BigInt64Array(4);
-          a[0] = 1234567890123456789n;
-          a[1] = -1n;
-          log('[+] construct + write OK', 'ok');
-          log('[+] a[0] = ' + a[0].toString() + '  a[1] = ' + a[1].toString(), 'ok');
-        } catch (e) {
-          log('[-] BigInt64Array error: ' + e, 'fail');
-        }
-      }
-
-      log('');
-      log('=== createImageBitmap ===', 'hdr');
-      if (typeof createImageBitmap === 'undefined') {
-        log('[-] createImageBitmap missing', 'fail');
-      } else {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = 16; canvas.height = 16;
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = '#0f0';
-          ctx.fillRect(0, 0, 16, 16);
-          createImageBitmap(canvas).then(bmp => {
-            log('[+] createImageBitmap(canvas) OK, size=' + bmp.width + 'x' + bmp.height, 'ok');
-            bmp.close && bmp.close();
-          }).catch(e => {
-            log('[-] createImageBitmap rejected: ' + e, 'fail');
-          });
-          log('[*] createImageBitmap call issued (async)', 'info');
-        } catch (e) {
-          log('[-] createImageBitmap error: ' + e, 'fail');
-        }
-      }
-
-      log('');
-      log('=== isSecureContext ===', 'hdr');
-      log(window.isSecureContext ? '[+] isSecureContext = true' : '[-] isSecureContext = false',
-          window.isSecureContext ? 'ok' : 'fail');
-
-      log('');
-      log('=== ArrayBuffer ceiling (quick) ===', 'hdr');
-      let maxOk = 0;
-      const sizes = [16, 32, 64, 128, 256, 512, 768, 1024];
-      for (const mb of sizes) {
-        try {
-          const b = new ArrayBuffer(mb * 1024 * 1024);
-          const v = new Uint8Array(b);
-          v[0] = 1; v[v.length-1] = 2;
-          maxOk = mb;
-          log('  [+] ' + mb + ' MB', 'ok');
-        } catch (e) {
-          log('  [-] ' + mb + ' MB -> ' + e.message, 'fail');
-          break;
-        }
-      }
-      log('[*] Highest successful: ' + maxOk + ' MB', maxOk ? 'ok' : 'fail');
-      log('');
-      log('[*] Deep check finished.', 'info');
+      log('[*] Deep check on remaining features', 'info');
+      log('Open [4] SLOW CHAIN for the progressive ramp style.', 'dim');
     }
 
-    log('[*] Y2JB-style probe host loaded (14.22 baseline built-in)', 'ok');
-    log('[*] [3] CHAIN combines remaining features and tries to surface debug-style effects', 'info');
+    log('[*] Probe host ready', 'ok');
+    log('[*] [4] SLOW CHAIN ramps like old loaders that slowly fed data until stable', 'info');
   </script>
 </body>
 </html>
