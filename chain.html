@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chain Probe // 14.22</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: #000;
+      color: #0f0;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 12px;
+    }
+    a { color: #0af; text-decoration: none; }
+    a:hover { color: #fff; }
+    .controls { margin: 10px 0; }
+    button {
+      background: #050505;
+      border: 1px solid #0a0;
+      color: #0f0;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 14px;
+      margin: 0 6px 6px 0;
+      cursor: pointer;
+    }
+    button:hover { border-color: #0f0; color: #fff; }
+    #log {
+      flex: 1;
+      background: #020202;
+      border: 1px solid #030;
+      padding: 10px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 12.5px;
+    }
+    .ok { color: #0f0; }
+    .fail { color: #f33; }
+    .info { color: #0af; }
+    .warn { color: #fa0; }
+    .dim { color: #060; }
+    .hdr { color: #0f0; }
+    #visual {
+      position: fixed;
+      top: 8px;
+      right: 8px;
+      width: 96px;
+      height: 96px;
+      border: 1px solid #0a0;
+      background: #000;
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="visual" width="64" height="64"></canvas>
+
+  <div class="wrap">
+    <div>
+      <a href="index.html">&lt;&lt; BACK</a>
+      &nbsp; CHAIN PROBE — combine still-alive features + force side-effects
+    </div>
+
+    <div class="controls">
+      <button onclick="runChain()">RUN FULL CHAIN</button>
+      <button onclick="runAggressive()">AGGRESSIVE (more pressure)</button>
+      <button onclick="clearLog()">Clear</button>
+    </div>
+
+    <div id="log">[*] Ready. This chains Atomics + BigInt64Array + createImageBitmap + isSecureContext\n[*] and tries to surface visible / debug-style effects.\n</div>
+  </div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    const vis = document.getElementById('visual');
+    const vctx = vis.getContext('2d');
+
+    function log(msg, cls) {
+      const line = document.createElement('div');
+      if (cls) line.className = cls;
+      line.textContent = msg;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+      // also mirror to real console in case remote debugging ever attaches
+      try { console.log('%c' + msg, 'color:' + (cls === 'fail' ? 'red' : cls === 'warn' ? 'orange' : '#0f0')); } catch(e){}
+    }
+    function clearLog() { logEl.innerHTML = ''; }
+
+    function paintStatus(ok) {
+      vctx.fillStyle = ok ? '#0f0' : '#f00';
+      vctx.fillRect(0, 0, 64, 64);
+      vctx.fillStyle = '#000';
+      vctx.font = '10px monospace';
+      vctx.fillText(ok ? 'OK' : 'ERR', 20, 36);
+    }
+
+    async function runChain() {
+      clearLog();
+      log('[*] ===== FULL CHAIN START =====', 'hdr');
+      log('[*] ' + new Date().toISOString(), 'dim');
+      log('');
+
+      // 1. isSecureContext gate
+      log('=== 1. isSecureContext ===', 'info');
+      if (!window.isSecureContext) {
+        log('[-] Not a secure context — some APIs may be restricted', 'fail');
+        paintStatus(false);
+      } else {
+        log('[+] isSecureContext = true', 'ok');
+      }
+
+      // 2. BigInt64Array allocation + pattern
+      log('');
+      log('=== 2. BigInt64Array pattern ===', 'info');
+      let big = null;
+      try {
+        big = new BigInt64Array(256);
+        for (let i = 0; i < big.length; i++) {
+          big[i] = BigInt(i) * 0xdeadbeefn ^ 0x1337c0den;
+        }
+        log('[+] BigInt64Array(256) filled', 'ok');
+        log('    [0]=' + big[0].toString() + '  [1]=' + big[1].toString(), 'dim');
+      } catch (e) {
+        log('[-] BigInt64Array failed: ' + e, 'fail');
+        paintStatus(false);
+        return;
+      }
+
+      // 3. Atomics on a normal buffer (expected to reject) + noise
+      log('');
+      log('=== 3. Atomics behavior ===', 'info');
+      try {
+        const ab = new ArrayBuffer(64);
+        const i32 = new Int32Array(ab);
+        i32[0] = 0x41414141;
+        try {
+          Atomics.add(i32, 0, 1);
+          log('[!] Atomics.add on non-shared succeeded (unexpected)', 'warn');
+        } catch (e) {
+          log('[+] Atomics correctly rejected non-shared: ' + e.name, 'ok');
+        }
+        // just touching the Atomics object
+        const names = Object.getOwnPropertyNames(Atomics);
+        log('[+] Atomics methods: ' + names.join(', '), 'ok');
+      } catch (e) {
+        log('[-] Atomics section error: ' + e, 'fail');
+      }
+
+      // 4. createImageBitmap chain (visual side-effect)
+      log('');
+      log('=== 4. createImageBitmap visual chain ===', 'info');
+      try {
+        const c = document.createElement('canvas');
+        c.width = 64; c.height = 64;
+        const ctx = c.getContext('2d');
+        // draw something that will be obvious if it ever gets composited weirdly
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, 64, 64);
+        ctx.fillStyle = '#0f0';
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText('CHAIN', 8, 28);
+        ctx.fillText('14.22', 8, 44);
+
+        const bmp = await createImageBitmap(c);
+        log('[+] createImageBitmap OK (' + bmp.width + 'x' + bmp.height + ')', 'ok');
+
+        // paint it to the visible corner canvas
+        vctx.clearRect(0, 0, 64, 64);
+        vctx.drawImage(bmp, 0, 0);
+        log('[+] drew bitmap to on-screen canvas (top-right)', 'ok');
+
+        if (bmp.close) bmp.close();
+      } catch (e) {
+        log('[-] createImageBitmap chain failed: ' + e, 'fail');
+        paintStatus(false);
+      }
+
+      // 5. Force some console / error surface
+      log('');
+      log('=== 5. Force console + error surface ===', 'info');
+      try {
+        console.log('[CHAIN] marker log from 14.22 probe');
+        console.warn('[CHAIN] warn marker');
+        console.error('[CHAIN] error marker — watching for debug overlay');
+        log('[+] console.log / warn / error fired', 'ok');
+      } catch (e) {
+        log('[-] console.* failed: ' + e, 'fail');
+      }
+
+      // deliberate recoverable error to see if anything surfaces
+      try {
+        null.f();
+      } catch (e) {
+        log('[+] caught deliberate TypeError: ' + e.message, 'ok');
+        try { console.error(e); } catch(_){}
+      }
+
+      // 6. Tiny timing / allocation noise using remaining primitives
+      log('');
+      log('=== 6. Mixed pressure (BigInt + normal buffers) ===', 'info');
+      try {
+        const bufs = [];
+        for (let i = 0; i < 32; i++) {
+          const b = new ArrayBuffer(1024 * 1024); // 1 MB
+          const view = new BigInt64Array(b);
+          view[0] = BigInt(i);
+          bufs.push(view);
+        }
+        log('[+] 32 x 1MB buffers with BigInt64Array views held', 'ok');
+        // release
+        bufs.length = 0;
+      } catch (e) {
+        log('[-] mixed pressure failed: ' + e, 'fail');
+      }
+
+      log('');
+      log('[*] ===== CHAIN FINISHED =====', 'hdr');
+      log('[*] Watch the top-right 64x64 canvas and any on-screen debug / error UI', 'warn');
+      log('[*] If a system debug message or overlay appeared, note exactly when', 'warn');
+      paintStatus(true);
+    }
+
+    async function runAggressive() {
+      clearLog();
+      log('[*] ===== AGGRESSIVE CHAIN =====', 'hdr');
+      log('[*] Higher allocation + repeated ImageBitmap + Atomics noise', 'info');
+      log('');
+
+      try {
+        // repeated ImageBitmap create/close
+        for (let i = 0; i < 20; i++) {
+          const c = document.createElement('canvas');
+          c.width = 128; c.height = 128;
+          const ctx = c.getContext('2d');
+          ctx.fillStyle = i % 2 ? '#0f0' : '#030';
+          ctx.fillRect(0, 0, 128, 128);
+          const bmp = await createImageBitmap(c);
+          vctx.drawImage(bmp, 0, 0, 64, 64);
+          if (bmp.close) bmp.close();
+        }
+        log('[+] 20x createImageBitmap cycle done', 'ok');
+
+        // larger BigInt64Array
+        const big = new BigInt64Array(4096);
+        for (let i = 0; i < big.length; i++) big[i] = BigInt(i) ^ 0xcafebaben;
+        log('[+] BigInt64Array(4096) filled', 'ok');
+
+        // allocation staircase
+        let total = 0;
+        for (let mb = 32; mb <= 512; mb *= 2) {
+          try {
+            const b = new ArrayBuffer(mb * 1024 * 1024);
+            const v = new BigInt64Array(b);
+            v[0] = 1n;
+            total = mb;
+            log('  [+] ' + mb + ' MB with BigInt64 view', 'ok');
+          } catch (e) {
+            log('  [-] ' + mb + ' MB failed: ' + e.message, 'fail');
+            break;
+          }
+        }
+        log('[*] peak = ' + total + ' MB', 'info');
+
+        // spam console
+        for (let i = 0; i < 10; i++) {
+          console.log('[AGG] marker ' + i);
+          console.error('[AGG] error marker ' + i);
+        }
+        log('[+] console spam finished', 'ok');
+
+      } catch (e) {
+        log('[-] aggressive run error: ' + e, 'fail');
+        paintStatus(false);
+        return;
+      }
+
+      log('');
+      log('[*] Aggressive chain finished. Check for any debug overlay / freeze / KP.', 'warn');
+      paintStatus(true);
+    }
+  </script>
+</body>
+</html>

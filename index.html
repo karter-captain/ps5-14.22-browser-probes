@@ -99,17 +99,18 @@
 
     <div class="menu">
       <a class="btn" href="#" onclick="runQuickScan(); return false;"><span>[1]</span> QUICK SCAN + BASELINE</a>
-      <a class="btn" href="#" onclick="runDeepRemaining(); return false;"><span>[2]</span> DEEP CHECK (still-alive features)</a>
-      <a class="btn" href="webkit-sniff.html"><span>[3]</span> Full Sniff</a>
-      <a class="btn" href="alloc-pressure.html"><span>[4]</span> Alloc Pressure</a>
-      <a class="btn" href="typedarray-edge.html"><span>[5]</span> TypedArray Edge</a>
-      <a class="btn" href="iframe-sandbox.html"><span>[6]</span> iframe</a>
-      <a class="btn" href="notes.html"><span>[7]</span> Notes</a>
+      <a class="btn" href="#" onclick="runDeepRemaining(); return false;"><span>[2]</span> DEEP CHECK</a>
+      <a class="btn" href="chain.html"><span>[3]</span> CHAIN (combine still-alive)</a>
+      <a class="btn" href="webkit-sniff.html"><span>[4]</span> Full Sniff</a>
+      <a class="btn" href="alloc-pressure.html"><span>[5]</span> Alloc Pressure</a>
+      <a class="btn" href="typedarray-edge.html"><span>[6]</span> TypedArray Edge</a>
+      <a class="btn" href="iframe-sandbox.html"><span>[7]</span> iframe</a>
+      <a class="btn" href="notes.html"><span>[8]</span> Notes</a>
     </div>
 
     <div class="results">
       <div class="results-title">// VULNERABILITY / FEATURE RESULTS</div>
-      <div id="log">[*] Ready. Run [1] Quick Scan or [2] Deep Check.\n</div>
+      <div id="log">[*] Ready. Run [1] / [2] or open [3] CHAIN to combine remaining features.\n</div>
     </div>
   </div>
 
@@ -124,7 +125,6 @@
     }
     function clearLog() { logEl.innerHTML = ''; }
 
-    // Known 14.22 baseline from live testing (Nov 2026)
     const BASELINE_14_22 = {
       'Atomics': true,
       'BigInt64Array': true,
@@ -167,12 +167,9 @@
 
       log('=== ALIVE / DEAD vs known 14.22 baseline ===', 'hdr');
       log('');
-
-      // Still expected alive
       log('-- Still present on 14.22 --', 'info');
       ['Atomics', 'BigInt64Array', 'createImageBitmap', 'isSecureContext'].forEach(name => {
         const now = current[name];
-        const expected = BASELINE_14_22[name];
         if (now) log('  [+] ' + name + '  (matches baseline)', 'ok');
         else log('  [-] ' + name + '  MISSING (was present on baseline)', 'fail');
       });
@@ -191,7 +188,6 @@
       const dead  = Object.keys(current).filter(k => !current[k]);
       log('  Alive : ' + alive.join(', '), 'ok');
       log('  Dead  : ' + dead.join(', '), 'fail');
-
       log('');
       log('[*] No public 14.22 chain known. Report real findings via HackerOne.', 'warn');
     }
@@ -201,38 +197,26 @@
       log('[*] Deep checks on features still present on 14.22', 'info');
       log('');
 
-      // Atomics
       log('=== Atomics ===', 'hdr');
       if (typeof Atomics === 'undefined') {
         log('[-] Atomics missing', 'fail');
       } else {
         try {
-          const sab = typeof SharedArrayBuffer !== 'undefined' ? new SharedArrayBuffer(16) : null;
-          if (!sab) {
-            log('[*] SharedArrayBuffer gone — testing Atomics on normal TypedArray view', 'info');
-            const buf = new ArrayBuffer(16);
-            const i32 = new Int32Array(buf);
-            i32[0] = 42;
-            // Atomics on non-shared buffer should throw
-            try {
-              Atomics.add(i32, 0, 1);
-              log('[!] Atomics.add on non-shared buffer succeeded (unexpected)', 'warn');
-            } catch (e) {
-              log('[+] Atomics correctly rejects non-shared buffer: ' + e.name, 'ok');
-            }
-          } else {
-            const i32 = new Int32Array(sab);
-            Atomics.store(i32, 0, 7);
-            const v = Atomics.load(i32, 0);
-            log('[+] Atomics.store/load on SAB works, value=' + v, 'ok');
+          const buf = new ArrayBuffer(16);
+          const i32 = new Int32Array(buf);
+          i32[0] = 42;
+          try {
+            Atomics.add(i32, 0, 1);
+            log('[!] Atomics.add on non-shared buffer succeeded (unexpected)', 'warn');
+          } catch (e) {
+            log('[+] Atomics correctly rejects non-shared buffer: ' + e.name, 'ok');
           }
-          log('[+] Atomics object keys: ' + Object.getOwnPropertyNames(Atomics).join(', '), 'ok');
+          log('[+] Atomics methods: ' + Object.getOwnPropertyNames(Atomics).join(', '), 'ok');
         } catch (e) {
           log('[-] Atomics test error: ' + e, 'fail');
         }
       }
 
-      // BigInt64Array
       log('');
       log('=== BigInt64Array ===', 'hdr');
       if (typeof BigInt64Array === 'undefined') {
@@ -244,14 +228,11 @@
           a[1] = -1n;
           log('[+] construct + write OK', 'ok');
           log('[+] a[0] = ' + a[0].toString() + '  a[1] = ' + a[1].toString(), 'ok');
-          const b = new BigInt64Array(a.buffer, 0, 2);
-          log('[+] view on same buffer OK, length=' + b.length, 'ok');
         } catch (e) {
           log('[-] BigInt64Array error: ' + e, 'fail');
         }
       }
 
-      // createImageBitmap
       log('');
       log('=== createImageBitmap ===', 'hdr');
       if (typeof createImageBitmap === 'undefined') {
@@ -269,19 +250,17 @@
           }).catch(e => {
             log('[-] createImageBitmap rejected: ' + e, 'fail');
           });
-          log('[*] createImageBitmap call issued (async result above)', 'info');
+          log('[*] createImageBitmap call issued (async)', 'info');
         } catch (e) {
           log('[-] createImageBitmap error: ' + e, 'fail');
         }
       }
 
-      // isSecureContext
       log('');
       log('=== isSecureContext ===', 'hdr');
       log(window.isSecureContext ? '[+] isSecureContext = true' : '[-] isSecureContext = false',
           window.isSecureContext ? 'ok' : 'fail');
 
-      // Quick ArrayBuffer ceiling
       log('');
       log('=== ArrayBuffer ceiling (quick) ===', 'hdr');
       let maxOk = 0;
@@ -299,14 +278,12 @@
         }
       }
       log('[*] Highest successful: ' + maxOk + ' MB', maxOk ? 'ok' : 'fail');
-
       log('');
       log('[*] Deep check finished.', 'info');
     }
 
-    // Banner
     log('[*] Y2JB-style probe host loaded (14.22 baseline built-in)', 'ok');
-    log('[*] Run [1] for alive/dead table or [2] for deeper checks on remaining features', 'info');
+    log('[*] [3] CHAIN combines remaining features and tries to surface debug-style effects', 'info');
   </script>
 </body>
 </html>
