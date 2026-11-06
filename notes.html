@@ -2,42 +2,45 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Notes</title>
+  <title>Notes // Y2JB style</title>
   <style>
-    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; max-width: 720px; line-height: 1.6; }
-    a { color: #58a6ff; }
-    code { background: #161b22; padding: 2px 6px; border-radius: 4px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #000; color: #0f0; font-family: "Courier New", Courier, monospace; font-size: 13px; padding: 16px; max-width: 800px; line-height: 1.5; }
+    a { color: #0af; text-decoration: none; }
+    h2 { color: #0f0; margin: 16px 0 6px; font-size: 14px; }
+    p, li { color: #0c0; margin-bottom: 6px; }
+    ul { padding-left: 18px; }
+    .dim { color: #060; }
   </style>
 </head>
 <body>
-  <p><a href="index.html">&larr; Back</a></p>
-  <h1>Notes for 14.22 testing</h1>
+  <a href="index.html">&lt;&lt; BACK</a>
+  <h2>// NOTES FOR 14.22 TESTING</h2>
 
-  <h2>What this suite is</h2>
-  <p>Purely diagnostic pages. They do not contain any exploit chains. They exist so you can observe how the 14.22 browser behaves under common allocation patterns, feature checks, and edge cases that historically mattered for WebKit entry points.</p>
+  <p>This suite is diagnostic only. It does not contain any exploit chain. It exists so you can observe how the 14.22 browser behaves under common patterns that historically mattered for WebKit entry points.</p>
 
   <h2>What to watch for</h2>
   <ul>
-    <li>Unexpected browser freezes or black screens</li>
-    <li>Kernel panics (console restarts)</li>
-    <li>Differences in maximum ArrayBuffer size vs earlier firmwares</li>
+    <li>Unexpected freezes or black screens</li>
+    <li>Kernel panics (console restart)</li>
+    <li>Differences in max ArrayBuffer size vs earlier firmwares</li>
     <li>Missing or changed WebAssembly / SharedArrayBuffer behavior</li>
-    <li>Any contentDocument or postMessage differences inside sandboxed iframes</li>
+    <li>contentDocument or postMessage differences inside sandboxed iframes</li>
   </ul>
 
   <h2>Logging tips</h2>
   <ul>
-    <li>Keep a phone or second device filming the TV if the console locks up</li>
-    <li>Note exact timing of any crash relative to which button / allocation size you pressed</li>
-    <li>If you get a reproducible panic, write down the last successful log line</li>
+    <li>Film the TV with a phone if the console locks up</li>
+    <li>Note exact timing relative to which button / size you pressed</li>
+    <li>Record the last successful log line before any KP</li>
   </ul>
 
   <h2>Responsible path</h2>
-  <p>If you discover something that looks like a real memory-corruption or sandbox-escape primitive, the current scene norm is to report it through Sony’s HackerOne program first. Public release usually follows after the fix is shipped.</p>
+  <p>If you find something that looks like real memory corruption or a sandbox escape, report it through Sony’s HackerOne program first. Public release usually follows after the fix is shipped.</p>
 
-  <h2>Disc drive note</h2>
-  <p>You have a disc drive, so BD-J remains a theoretical secondary surface. These browser pages will not exercise BD-J. That path needs different tooling (disc image + Java classpath tests).</p>
+  <h2>Disc drive</h2>
+  <p>You have a disc drive, so BD-J remains a theoretical secondary surface. These browser pages will not exercise BD-J.</p>
 
-  <p style="margin-top: 40px; color: #8b949e; font-size: 0.9rem;">Repo: karter-captain/ps5-14.22-browser-probes</p>
+  <p class="dim" style="margin-top:24px">Repo: karter-captain/ps5-14.22-browser-probes</p>
 </body>
 </html>

@@ -2,59 +2,63 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>iframe / sandbox</title>
+  <title>iframe sandbox // Y2JB style</title>
   <style>
-    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
-    pre { background: #161b22; padding: 16px; border-radius: 8px; overflow: auto; font-size: 0.85rem; }
-    iframe { width: 100%; height: 120px; border: 1px solid #30363d; background: #000; margin: 8px 0; }
-    a { color: #58a6ff; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #000; color: #0f0; font-family: "Courier New", Courier, monospace; font-size: 13px; }
+    .wrap { display: flex; flex-direction: column; height: 100%; padding: 12px; max-width: 900px; margin: 0 auto; }
+    a { color: #0af; text-decoration: none; }
+    iframe { width: 100%; height: 80px; border: 1px solid #030; background: #000; margin: 6px 0; }
+    #out { flex: 1; overflow-y: auto; white-space: pre-wrap; background: #020202; border: 1px solid #030; padding: 10px; margin-top: 8px; }
+    .ok { color: #0f0; } .fail { color: #f33; } .info { color: #0af; } .dim { color: #060; }
   </style>
 </head>
 <body>
-  <p><a href="index.html">&larr; Back</a></p>
-  <h1>iframe / sandbox behavior</h1>
-  <pre id="out">Loading frames...</pre>
-
-  <h3>Same-origin iframe</h3>
-  <iframe id="same" src="about:blank"></iframe>
-
-  <h3>Sandboxed iframe (allow-scripts)</h3>
-  <iframe id="sand" sandbox="allow-scripts" src="about:blank"></iframe>
-
+  <div class="wrap">
+    <div><a href="index.html">&lt;&lt; BACK</a> &nbsp; iframe / sandbox</div>
+    <div style="color:#0a0; font-size:12px; margin:6px 0;">same-origin frame</div>
+    <iframe id="same" src="about:blank"></iframe>
+    <div style="color:#0a0; font-size:12px;">sandboxed (allow-scripts)</div>
+    <iframe id="sand" sandbox="allow-scripts" src="about:blank"></iframe>
+    <div id="out">Loading...\n</div>
+  </div>
   <script>
     const out = document.getElementById('out');
-    function log(s) { out.textContent += s + '\n'; }
-
+    function log(s, cls) {
+      const d = document.createElement('div');
+      if (cls) d.className = cls;
+      d.textContent = s;
+      out.appendChild(d);
+    }
     function testFrame(id, label) {
       try {
         const f = document.getElementById(id);
         const doc = f.contentDocument;
         if (!doc) {
-          log(label + ': contentDocument is null (blocked)');
+          log('[-] ' + label + ': contentDocument null (blocked)', 'fail');
           return;
         }
-        doc.body.innerHTML = '<p style="color:#fff;font-family:sans-serif">' + label + ' reachable</p>';
-        log(label + ': contentDocument accessible');
+        doc.body.innerHTML = '<p style="color:#0f0;font-family:monospace;font-size:12px;margin:4px">' + label + ' reachable</p>';
+        log('[+] ' + label + ': contentDocument accessible', 'ok');
         try {
-          f.contentWindow.postMessage({probe: true}, '*');
-          log(label + ': postMessage sent');
+          f.contentWindow.postMessage({probe:true}, '*');
+          log('[+] ' + label + ': postMessage sent', 'ok');
         } catch (e) {
-          log(label + ': postMessage failed - ' + e.message);
+          log('[-] ' + label + ': postMessage failed - ' + e.message, 'fail');
         }
       } catch (e) {
-        log(label + ': ERROR - ' + e.message);
+        log('[-] ' + label + ': ' + e.message, 'fail');
       }
     }
-
     window.addEventListener('message', e => {
-      log('message event received: ' + JSON.stringify(e.data));
+      log('[+] message event: ' + JSON.stringify(e.data), 'ok');
     });
-
     setTimeout(() => {
-      log('=== iframe probes ===');
+      out.innerHTML = '';
+      log('=== iframe probes ===', 'info');
       testFrame('same', 'same-origin');
       testFrame('sand', 'sandboxed');
-      log('Done.');
+      log('Done.', 'dim');
     }, 300);
   </script>
 </body>

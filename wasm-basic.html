@@ -2,58 +2,57 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>WebAssembly Basics</title>
+  <title>WASM // Y2JB style</title>
   <style>
-    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
-    pre { background: #161b22; padding: 16px; border-radius: 8px; overflow: auto; font-size: 0.85rem; }
-    a { color: #58a6ff; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #000; color: #0f0; font-family: "Courier New", Courier, monospace; font-size: 13px; }
+    .wrap { display: flex; flex-direction: column; height: 100%; padding: 12px; max-width: 900px; margin: 0 auto; }
+    a { color: #0af; text-decoration: none; }
+    #out { flex: 1; overflow-y: auto; white-space: pre-wrap; background: #020202; border: 1px solid #030; padding: 10px; margin-top: 8px; }
+    .ok { color: #0f0; } .fail { color: #f33; } .info { color: #0af; } .dim { color: #060; }
   </style>
 </head>
 <body>
-  <p><a href="index.html">&larr; Back</a></p>
-  <h1>WebAssembly Basics</h1>
-  <pre id="out">Running...</pre>
-
+  <div class="wrap">
+    <div><a href="index.html">&lt;&lt; BACK</a> &nbsp; WebAssembly Basics</div>
+    <div id="out">Running...\n</div>
+  </div>
   <script>
     const out = document.getElementById('out');
-    function log(s) { out.textContent += s + '\n'; }
-
+    function log(s, cls) {
+      const d = document.createElement('div');
+      if (cls) d.className = cls;
+      d.textContent = s;
+      out.appendChild(d);
+    }
     async function run() {
+      out.innerHTML = '';
       try {
         if (typeof WebAssembly === 'undefined') {
-          log('WebAssembly not available');
+          log('[-] WebAssembly not available', 'fail');
           return;
         }
-        log('WebAssembly object present');
+        log('[+] WebAssembly object present', 'ok');
 
-        // Minimal valid WASM module (empty)
-        // (module)
-        const bytes = new Uint8Array([
-          0x00, 0x61, 0x73, 0x6d, // magic
-          0x01, 0x00, 0x00, 0x00  // version
-        ]);
-
+        const bytes = new Uint8Array([0x00,0x61,0x73,0x6d, 0x01,0x00,0x00,0x00]);
         const mod = await WebAssembly.compile(bytes);
-        log('compile(empty module) OK');
-
+        log('[+] compile(empty module) OK', 'ok');
         const inst = await WebAssembly.instantiate(mod);
-        log('instantiate OK');
+        log('[+] instantiate OK', 'ok');
 
-        // Memory growth test
         if (WebAssembly.Memory) {
           const mem = new WebAssembly.Memory({ initial: 1, maximum: 100 });
-          log('Memory initial pages: ' + mem.buffer.byteLength / 65536);
+          log('[+] Memory initial pages: ' + (mem.buffer.byteLength / 65536), 'ok');
           try {
             const grown = mem.grow(10);
-            log('grow(10) returned old size: ' + grown + ', new pages: ' + mem.buffer.byteLength / 65536);
+            log('[+] grow(10) old=' + grown + '  new pages=' + (mem.buffer.byteLength / 65536), 'ok');
           } catch (e) {
-            log('grow failed: ' + e.message);
+            log('[-] grow failed: ' + e.message, 'fail');
           }
         }
-
-        log('\nDone.');
+        log('\nDone.', 'dim');
       } catch (e) {
-        log('ERROR: ' + e);
+        log('ERROR: ' + e, 'fail');
       }
     }
     run();

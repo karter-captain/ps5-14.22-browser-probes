@@ -2,65 +2,74 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>WebKit / Feature Sniff</title>
+  <title>WebKit Sniff // Y2JB style</title>
   <style>
-    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
-    pre { background: #161b22; padding: 16px; border-radius: 8px; overflow: auto; font-size: 0.85rem; }
-    a { color: #58a6ff; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #000; color: #0f0; font-family: "Courier New", Courier, monospace; font-size: 13px; }
+    .wrap { display: flex; flex-direction: column; height: 100%; padding: 12px; max-width: 900px; margin: 0 auto; }
+    a { color: #0af; text-decoration: none; }
+    a:hover { color: #fff; }
+    #out { flex: 1; overflow-y: auto; white-space: pre-wrap; background: #020202; border: 1px solid #030; padding: 10px; margin-top: 8px; }
+    .ok { color: #0f0; } .fail { color: #f33; } .info { color: #0af; } .dim { color: #060; }
   </style>
 </head>
 <body>
-  <p><a href="index.html">&larr; Back</a></p>
-  <h1>WebKit / UA / Feature Sniff</h1>
-  <pre id="out">Running...</pre>
-
+  <div class="wrap">
+    <div><a href="index.html">&lt;&lt; BACK</a> &nbsp; WebKit / UA / Feature Sniff</div>
+    <div id="out">Running...\n</div>
+  </div>
   <script>
     const out = document.getElementById('out');
-    function line(s) { out.textContent += s + '\n'; }
-
+    function line(s, cls) {
+      const d = document.createElement('div');
+      if (cls) d.className = cls;
+      d.textContent = s;
+      out.appendChild(d);
+    }
     try {
-      line('=== Navigator ===');
-      line('userAgent: ' + navigator.userAgent);
-      line('platform: ' + navigator.platform);
-      line('vendor: ' + navigator.vendor);
-      line('language: ' + navigator.language);
-      line('hardwareConcurrency: ' + navigator.hardwareConcurrency);
-      line('deviceMemory: ' + (navigator.deviceMemory || 'n/a'));
-      line('maxTouchPoints: ' + navigator.maxTouchPoints);
+      line('=== Navigator ===', 'info');
+      line('userAgent : ' + navigator.userAgent, 'ok');
+      line('platform  : ' + navigator.platform, 'ok');
+      line('vendor    : ' + navigator.vendor, 'ok');
+      line('language  : ' + navigator.language, 'ok');
+      line('cores     : ' + navigator.hardwareConcurrency, 'ok');
+      line('deviceMem : ' + (navigator.deviceMemory || 'n/a'), 'ok');
 
-      line('\n=== Screen / Window ===');
-      line('screen: ' + screen.width + 'x' + screen.height + ' @' + (window.devicePixelRatio || 1));
-      line('inner: ' + window.innerWidth + 'x' + window.innerHeight);
+      line('\n=== Screen / Window ===', 'info');
+      line('screen : ' + screen.width + 'x' + screen.height + ' @' + (window.devicePixelRatio||1), 'ok');
+      line('inner  : ' + window.innerWidth + 'x' + window.innerHeight, 'ok');
 
-      line('\n=== Feature Detection ===');
-      const features = {
-        'SharedArrayBuffer': typeof SharedArrayBuffer !== 'undefined',
-        'Atomics': typeof Atomics !== 'undefined',
-        'WebAssembly': typeof WebAssembly !== 'undefined',
-        'BigInt64Array': typeof BigInt64Array !== 'undefined',
-        'WebGL2': !!document.createElement('canvas').getContext('webgl2'),
-        'OffscreenCanvas': typeof OffscreenCanvas !== 'undefined',
-        'createImageBitmap': typeof createImageBitmap !== 'undefined',
-        'Performance.memory': !!(performance && performance.memory),
-        'crossOriginIsolated': window.crossOriginIsolated === true,
-        'isSecureContext': window.isSecureContext === true
+      line('\n=== Feature Detection ===', 'info');
+      const feats = {
+        SharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+        Atomics: typeof Atomics !== 'undefined',
+        WebAssembly: typeof WebAssembly !== 'undefined',
+        BigInt64Array: typeof BigInt64Array !== 'undefined',
+        WebGL2: !!document.createElement('canvas').getContext('webgl2'),
+        OffscreenCanvas: typeof OffscreenCanvas !== 'undefined',
+        createImageBitmap: typeof createImageBitmap !== 'undefined',
+        'performance.memory': !!(performance && performance.memory),
+        crossOriginIsolated: window.crossOriginIsolated === true,
+        isSecureContext: window.isSecureContext === true
       };
-      Object.keys(features).forEach(k => line(k + ': ' + features[k]));
+      Object.keys(feats).forEach(k => {
+        line((feats[k] ? '[+] ' : '[-] ') + k, feats[k] ? 'ok' : 'fail');
+      });
 
       if (performance && performance.memory) {
-        line('\n=== performance.memory ===');
-        line('jsHeapSizeLimit: ' + performance.memory.jsHeapSizeLimit);
-        line('totalJSHeapSize: ' + performance.memory.totalJSHeapSize);
-        line('usedJSHeapSize: ' + performance.memory.usedJSHeapSize);
+        line('\n=== performance.memory ===', 'info');
+        line('jsHeapSizeLimit : ' + performance.memory.jsHeapSizeLimit, 'ok');
+        line('totalJSHeapSize : ' + performance.memory.totalJSHeapSize, 'ok');
+        line('usedJSHeapSize  : ' + performance.memory.usedJSHeapSize, 'ok');
       }
 
-      line('\n=== WebKit version guess (from UA) ===');
       const m = navigator.userAgent.match(/AppleWebKit\/([\d.]+)/);
-      line(m ? m[0] : 'not found');
+      line('\n=== WebKit token ===', 'info');
+      line(m ? m[0] : 'not found', m ? 'ok' : 'fail');
 
-      line('\nDone.');
+      line('\nDone.', 'dim');
     } catch (e) {
-      line('ERROR: ' + e);
+      line('ERROR: ' + e, 'fail');
     }
   </script>
 </body>

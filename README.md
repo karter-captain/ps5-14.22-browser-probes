@@ -1,34 +1,26 @@
-# PS5 14.22 Browser Probes
+# PS5 14.22 Browser Probes (Y2JB-style)
 
-Static diagnostic pages for researching the PS5 browser on firmware **14.22** (Slim + disc drive).
+Black / monospace diagnostic pages styled after the classic Y2JB loader look.
 
-These pages are **not** exploits. They perform feature detection, allocation pressure tests, TypedArray edge cases, iframe behavior checks, and basic WebAssembly probes so you can observe differences or instability on the current firmware.
+**Target:** Firmware 14.22 (Slim + disc)  
+**Purpose:** Observe browser behavior only. No public exploit chain for 14.22 exists.
 
 ## Live URL
-
-Once GitHub Pages is enabled:
+After enabling GitHub Pages:
 
 `https://karter-captain.github.io/ps5-14.22-browser-probes/`
 
-## Enable GitHub Pages
+## Enable Pages
+Repo → Settings → Pages → Deploy from branch `main` / root → Save
 
-1. Go to the repository **Settings → Pages**
-2. Source: Deploy from a branch
-3. Branch: `main` / root
-4. Save
+## Pages
+- `index.html` – main menu + live vulnerability results panel + Quick Scan
+- `webkit-sniff.html` – UA / features / memory
+- `alloc-pressure.html` – progressive ArrayBuffer allocation
+- `typedarray-edge.html` – boundary sizes, transfer, views
+- `iframe-sandbox.html` – same-origin vs sandboxed frames
+- `wasm-basic.html` – minimal WASM + Memory.grow
+- `notes.html` – testing notes
 
-## Pages included
-
-| Page | Purpose |
-|------|--------|
-| `index.html` | Menu |
-| `webkit-sniff.html` | UA, features, memory info |
-| `alloc-pressure.html` | Progressive large ArrayBuffer allocation |
-| `typedarray-edge.html` | Boundary sizes, transfer, overlapping views |
-| `iframe-sandbox.html` | Same-origin vs sandboxed iframe behavior |
-| `wasm-basic.html` | Minimal WASM compile + Memory.grow |
-| `notes.html` | Testing notes |
-
-## Intended use
-
-Load the pages from the PS5 browser while on 14.22 and note any freezes, panics, or unexpected limits. Useful signals should be documented and, if they look like real bugs, reported through Sony’s HackerOne program.
+## Style
+Pure black background, monospace green text, status colors matching typical Y2JB / loader log output. Results panel stays at the bottom of the main page.

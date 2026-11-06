@@ -2,90 +2,93 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>TypedArray / ArrayBuffer Edge Cases</title>
+  <title>TypedArray Edge // Y2JB style</title>
   <style>
-    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
-    pre { background: #161b22; padding: 16px; border-radius: 8px; overflow: auto; font-size: 0.85rem; }
-    button { background: #238636; color: white; border: none; padding: 10px 16px; border-radius: 6px; margin: 4px; cursor: pointer; }
-    a { color: #58a6ff; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #000; color: #0f0; font-family: "Courier New", Courier, monospace; font-size: 13px; }
+    .wrap { display: flex; flex-direction: column; height: 100%; padding: 12px; max-width: 900px; margin: 0 auto; }
+    a { color: #0af; text-decoration: none; }
+    button {
+      background: #050505; border: 1px solid #0a0; color: #0f0;
+      font-family: inherit; font-size: 13px; padding: 8px 14px; margin: 8px 0; cursor: pointer;
+    }
+    button:hover { border-color: #0f0; color: #fff; }
+    #out { flex: 1; overflow-y: auto; white-space: pre-wrap; background: #020202; border: 1px solid #030; padding: 10px; }
+    .ok { color: #0f0; } .fail { color: #f33; } .info { color: #0af; } .dim { color: #060; }
   </style>
 </head>
 <body>
-  <p><a href="index.html">&larr; Back</a></p>
-  <h1>TypedArray / ArrayBuffer Edge Cases</h1>
-  <button onclick="run()">Run Edge Tests</button>
-  <pre id="out"></pre>
-
+  <div class="wrap">
+    <div><a href="index.html">&lt;&lt; BACK</a> &nbsp; TypedArray / ArrayBuffer Edge Cases</div>
+    <button onclick="run()">Run Edge Tests</button>
+    <div id="out"></div>
+  </div>
   <script>
     const out = document.getElementById('out');
-    function log(s) { out.textContent += s + '\n'; }
-
+    function log(s, cls) {
+      const d = document.createElement('div');
+      if (cls) d.className = cls;
+      d.textContent = s;
+      out.appendChild(d);
+    }
     function run() {
-      out.textContent = '';
-      log('=== TypedArray / ArrayBuffer edge probes ===\n');
+      out.innerHTML = '';
+      log('=== TypedArray / ArrayBuffer edge probes ===', 'info');
 
-      // 1. Maximum practical ArrayBuffer
-      try {
-        const sizes = [1, 16, 64, 128, 256, 512, 1024, 1536, 2048];
-        for (const mb of sizes) {
-          try {
-            const b = new ArrayBuffer(mb * 1024 * 1024);
-            log('ArrayBuffer(' + mb + ' MB) OK');
-          } catch (e) {
-            log('ArrayBuffer(' + mb + ' MB) FAIL: ' + e.message);
-            break;
-          }
+      log('\n--- size ceiling ---', 'info');
+      const sizes = [1, 16, 64, 128, 256, 512, 1024, 1536, 2048];
+      for (const mb of sizes) {
+        try {
+          const b = new ArrayBuffer(mb * 1024 * 1024);
+          log('[+] ArrayBuffer(' + mb + ' MB) OK', 'ok');
+        } catch (e) {
+          log('[-] ArrayBuffer(' + mb + ' MB) FAIL: ' + e.message, 'fail');
+          break;
         }
-      } catch (e) { log('size loop error: ' + e); }
+      }
 
-      // 2. Detach / transfer behavior
-      log('\n--- transfer / detach ---');
+      log('\n--- transfer / detach ---', 'info');
       try {
         const ab = new ArrayBuffer(1024);
         const u8 = new Uint8Array(ab);
         u8[0] = 42;
         if (typeof ab.transfer === 'function') {
-          const transferred = ab.transfer();
-          log('ab.transfer() exists, byteLength after: ' + ab.byteLength);
-          log('new buffer length: ' + transferred.byteLength);
+          const t = ab.transfer();
+          log('[+] ab.transfer() exists, original byteLength now ' + ab.byteLength, 'ok');
+          log('    new buffer length: ' + t.byteLength, 'ok');
         } else {
-          log('ab.transfer() not present');
+          log('[-] ab.transfer() not present', 'fail');
         }
-        // structured clone detach attempt
         try {
           const ch = new MessageChannel();
           ch.port1.postMessage(ab, [ab]);
-          log('postMessage transfer: original byteLength now ' + ab.byteLength);
+          log('[+] postMessage transfer: original byteLength now ' + ab.byteLength, 'ok');
         } catch (e) {
-          log('postMessage transfer error: ' + e.message);
+          log('[-] postMessage transfer: ' + e.message, 'fail');
         }
-      } catch (e) { log('transfer section: ' + e); }
+      } catch (e) { log('transfer section error: ' + e, 'fail'); }
 
-      // 3. Overlapping views
-      log('\n--- overlapping views ---');
+      log('\n--- overlapping views ---', 'info');
       try {
         const ab = new ArrayBuffer(64);
         const u8 = new Uint8Array(ab);
         const u32 = new Uint32Array(ab);
-        u8[0] = 0x11; u8[1] = 0x22; u8[2] = 0x33; u8[3] = 0x44;
-        log('u32[0] after u8 writes: 0x' + u32[0].toString(16));
-      } catch (e) { log('overlap: ' + e); }
+        u8[0]=0x11; u8[1]=0x22; u8[2]=0x33; u8[3]=0x44;
+        log('[+] u32[0] after u8 writes: 0x' + u32[0].toString(16), 'ok');
+      } catch (e) { log('overlap error: ' + e, 'fail'); }
 
-      // 4. Very large TypedArray length
-      log('\n--- large length constructors ---');
-      try {
-        const lens = [0x7fffffff, 0x10000000, 0x4000000];
-        for (const len of lens) {
-          try {
-            const t = new Uint8Array(len);
-            log('new Uint8Array(' + len + ') OK, byteLength=' + t.byteLength);
-          } catch (e) {
-            log('new Uint8Array(' + len + ') FAIL: ' + e.message);
-          }
+      log('\n--- large length constructors ---', 'info');
+      const lens = [0x7fffffff, 0x10000000, 0x4000000];
+      for (const len of lens) {
+        try {
+          const t = new Uint8Array(len);
+          log('[+] new Uint8Array(' + len + ') OK, byteLength=' + t.byteLength, 'ok');
+        } catch (e) {
+          log('[-] new Uint8Array(' + len + ') FAIL: ' + e.message, 'fail');
         }
-      } catch (e) { log('large length: ' + e); }
+      }
 
-      log('\nDone.');
+      log('\nDone.', 'dim');
     }
   </script>
 </body>

@@ -2,32 +2,47 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Allocation Pressure</title>
+  <title>Alloc Pressure // Y2JB style</title>
   <style>
-    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
-    pre { background: #161b22; padding: 16px; border-radius: 8px; overflow: auto; font-size: 0.85rem; max-height: 60vh; }
-    button { background: #238636; color: white; border: none; padding: 10px 16px; border-radius: 6px; margin: 4px; cursor: pointer; }
-    a { color: #58a6ff; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #000; color: #0f0; font-family: "Courier New", Courier, monospace; font-size: 13px; }
+    .wrap { display: flex; flex-direction: column; height: 100%; padding: 12px; max-width: 900px; margin: 0 auto; }
+    a { color: #0af; text-decoration: none; }
+    .row { margin: 8px 0; }
+    button {
+      background: #050505; border: 1px solid #0a0; color: #0f0;
+      font-family: inherit; font-size: 13px; padding: 8px 14px; margin-right: 6px; cursor: pointer;
+    }
+    button:hover { border-color: #0f0; color: #fff; }
+    #out { flex: 1; overflow-y: auto; white-space: pre-wrap; background: #020202; border: 1px solid #030; padding: 10px; margin-top: 8px; }
+    .ok { color: #0f0; } .fail { color: #f33; } .info { color: #0af; } .dim { color: #060; }
   </style>
 </head>
 <body>
-  <p><a href="index.html">&larr; Back</a></p>
-  <h1>Allocation Pressure Test</h1>
-  <p>Attempts progressive large allocations and records timing / failures.</p>
-  <button onclick="runTest(64)">64 MB steps</button>
-  <button onclick="runTest(128)">128 MB steps</button>
-  <button onclick="runTest(256)">256 MB steps</button>
-  <button onclick="clearLog()">Clear</button>
-  <pre id="out"></pre>
-
+  <div class="wrap">
+    <div><a href="index.html">&lt;&lt; BACK</a> &nbsp; Allocation Pressure</div>
+    <div class="row">
+      <button onclick="run(64)">64 MB steps</button>
+      <button onclick="run(128)">128 MB steps</button>
+      <button onclick="run(256)">256 MB steps</button>
+      <button onclick="clearLog()">Clear</button>
+    </div>
+    <div id="out"></div>
+  </div>
   <script>
     const out = document.getElementById('out');
-    function log(s) { out.textContent += s + '\n'; out.scrollTop = out.scrollHeight; }
-    function clearLog() { out.textContent = ''; }
+    function log(s, cls) {
+      const d = document.createElement('div');
+      if (cls) d.className = cls;
+      d.textContent = s;
+      out.appendChild(d);
+      out.scrollTop = out.scrollHeight;
+    }
+    function clearLog() { out.innerHTML = ''; }
 
-    async function runTest(stepMB) {
+    async function run(stepMB) {
       clearLog();
-      log('Starting allocation pressure, step = ' + stepMB + ' MB');
+      log('[*] Allocation pressure  step=' + stepMB + ' MB', 'info');
       const buffers = [];
       let total = 0;
       const step = stepMB * 1024 * 1024;
@@ -36,22 +51,20 @@
         const t0 = performance.now();
         try {
           const buf = new ArrayBuffer(step);
-          // touch a few pages so the allocation is real
           const view = new Uint8Array(buf);
           view[0] = 1;
           view[view.length - 1] = 2;
           buffers.push(buf);
           total += stepMB;
           const dt = (performance.now() - t0).toFixed(1);
-          log('[' + i + '] +' + stepMB + ' MB  total=' + total + ' MB  time=' + dt + ' ms');
+          log('[' + String(i).padStart(2,'0') + '] +' + stepMB + ' MB  total=' + total + ' MB  ' + dt + ' ms', 'ok');
         } catch (e) {
-          log('[' + i + '] FAIL after ' + total + ' MB  → ' + e);
+          log('[' + String(i).padStart(2,'0') + '] FAIL after ' + total + ' MB  -> ' + e.message, 'fail');
           break;
         }
-        // yield so the page stays responsive
-        await new Promise(r => setTimeout(r, 30));
+        await new Promise(r => setTimeout(r, 25));
       }
-      log('Finished. Held buffers: ' + buffers.length);
+      log('[*] Held buffers: ' + buffers.length + '  peak ~' + total + ' MB', 'info');
     }
   </script>
 </body>

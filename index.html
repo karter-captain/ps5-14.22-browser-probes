@@ -3,72 +3,205 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PS5 14.22 Browser Probes</title>
+  <title>Y2JB Style Probe // 14.22</title>
   <style>
-    :root { --bg: #0d1117; --card: #161b22; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --ok: #3fb950; --warn: #d29922; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: 24px; }
-    h1 { font-size: 1.6rem; margin: 0 0 8px; }
-    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
-    .grid { display: grid; gap: 12px; max-width: 720px; }
-    a.card { display: block; background: var(--card); border: 1px solid #30363d; border-radius: 8px; padding: 16px; text-decoration: none; color: var(--text); transition: border-color 0.15s; }
-    a.card:hover { border-color: var(--accent); }
-    a.card h2 { margin: 0 0 4px; font-size: 1.1rem; color: var(--accent); }
-    a.card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
-    .log { margin-top: 32px; background: var(--card); border: 1px solid #30363d; border-radius: 8px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 240px; overflow: auto; }
-    footer { margin-top: 40px; color: var(--muted); font-size: 0.8rem; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: #000;
+      color: #0f0;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 14px;
+      line-height: 1.4;
+      overflow: hidden;
+    }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 12px;
+    }
+    .header {
+      border-bottom: 1px solid #0a0;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+    .header h1 {
+      color: #0f0;
+      font-size: 18px;
+      letter-spacing: 1px;
+    }
+    .header .sub {
+      color: #0a0;
+      font-size: 12px;
+      margin-top: 2px;
+    }
+    .menu {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: #050505;
+      border: 1px solid #0a0;
+      color: #0f0;
+      font-family: inherit;
+      font-size: 14px;
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .btn:hover, .btn:focus {
+      background: #0a0a0a;
+      border-color: #0f0;
+      color: #fff;
+    }
+    .btn span {
+      color: #0a0;
+      margin-right: 8px;
+    }
+    .results {
+      border-top: 1px solid #0a0;
+      margin-top: 10px;
+      padding-top: 8px;
+      height: 220px;
+      display: flex;
+      flex-direction: column;
+    }
+    .results-title {
+      color: #0f0;
+      font-size: 13px;
+      margin-bottom: 4px;
+      letter-spacing: 1px;
+    }
+    #log {
+      flex: 1;
+      background: #020202;
+      border: 1px solid #030;
+      padding: 8px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 12px;
+      color: #0c0;
+    }
+    .ok { color: #0f0; }
+    .fail { color: #f33; }
+    .info { color: #0af; }
+    .warn { color: #fa0; }
+    .dim { color: #060; }
   </style>
 </head>
 <body>
-  <h1>PS5 14.22 Browser Probes</h1>
-  <div class="meta">
-    Target: Firmware 14.22 &middot; Slim + disc drive<br>
-    Purpose: Diagnostic probes only (WebKit / memory / feature behavior)
+  <div class="wrap">
+    <div class="header">
+      <h1>Y2JB-STYLE BROWSER PROBE // FW 14.22</h1>
+      <div class="sub">Slim + disc &nbsp;|&nbsp; diagnostic only &nbsp;|&nbsp; no public chain</div>
+    </div>
+
+    <div class="menu">
+      <a class="btn" href="webkit-sniff.html"><span>[1]</span> WebKit / UA / Feature Sniff</a>
+      <a class="btn" href="alloc-pressure.html"><span>[2]</span> Allocation Pressure Test</a>
+      <a class="btn" href="typedarray-edge.html"><span>[3]</span> TypedArray / ArrayBuffer Edge Cases</a>
+      <a class="btn" href="iframe-sandbox.html"><span>[4]</span> iframe / sandbox / origin</a>
+      <a class="btn" href="wasm-basic.html"><span>[5]</span> WebAssembly Basics</a>
+      <a class="btn" href="#" onclick="runQuickScan(); return false;"><span>[6]</span> QUICK VULN SCAN (this page)</a>
+      <a class="btn" href="notes.html"><span>[7]</span> Notes / Logging Tips</a>
+    </div>
+
+    <div class="results">
+      <div class="results-title">// VULNERABILITY RESULTS</div>
+      <div id="log">[*] Ready. Select a probe or run Quick Scan.\n</div>
+    </div>
   </div>
-
-  <div class="grid">
-    <a class="card" href="webkit-sniff.html">
-      <h2>1. WebKit / UA / Feature Sniff</h2>
-      <p>User-Agent, WebKit version hints, feature detection, basic environment dump</p>
-    </a>
-    <a class="card" href="alloc-pressure.html">
-      <h2>2. Allocation Pressure</h2>
-      <p>Large ArrayBuffer / TypedArray allocation patterns and timing</p>
-    </a>
-    <a class="card" href="typedarray-edge.html">
-      <h2>3. TypedArray / ArrayBuffer Edge Cases</h2>
-      <p>Boundary sizes, views, transfer attempts, detachment behavior</p>
-    </a>
-    <a class="card" href="iframe-sandbox.html">
-      <h2>4. iframe / sandbox / origin</h2>
-      <p>Cross-frame communication and sandbox attribute behavior</p>
-    </a>
-    <a class="card" href="wasm-basic.html">
-      <h2>5. WebAssembly Basics</h2>
-      <p>Simple WASM module load + memory growth observations</p>
-    </a>
-    <a class="card" href="notes.html">
-      <h2>Notes &amp; Logging Tips</h2>
-      <p>How to capture useful signals on 14.22</p>
-    </a>
-  </div>
-
-  <div class="log" id="log">Ready. Open a probe page from the list above.</div>
-
-  <footer>
-    Research / educational use only. Report real findings via Sony HackerOne.
-  </footer>
 
   <script>
-    window.log = function(msg) {
-      const el = document.getElementById('log');
-      if (el) {
-        el.textContent += '\n' + new Date().toISOString().slice(11,19) + '  ' + msg;
-        el.scrollTop = el.scrollHeight;
+    const logEl = document.getElementById('log');
+    function log(msg, cls) {
+      const line = document.createElement('div');
+      if (cls) line.className = cls;
+      line.textContent = msg;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    function clearLog() { logEl.innerHTML = ''; }
+
+    function runQuickScan() {
+      clearLog();
+      log('[*] Starting quick vulnerability surface scan...', 'info');
+      log('[*] Target: PS5 browser on 14.22', 'dim');
+      log('');
+
+      // UA / WebKit
+      const ua = navigator.userAgent || '';
+      log('[+] userAgent: ' + ua, 'ok');
+      const wk = ua.match(/AppleWebKit\/([\d.]+)/);
+      if (wk) log('[+] WebKit version hint: ' + wk[1], 'ok');
+      else log('[-] No AppleWebKit token found', 'fail');
+
+      // Core features that historically mattered
+      const checks = [
+        ['SharedArrayBuffer', typeof SharedArrayBuffer !== 'undefined'],
+        ['Atomics', typeof Atomics !== 'undefined'],
+        ['WebAssembly', typeof WebAssembly !== 'undefined'],
+        ['BigInt64Array', typeof BigInt64Array !== 'undefined'],
+        ['crossOriginIsolated', window.crossOriginIsolated === true],
+        ['isSecureContext', window.isSecureContext === true],
+        ['performance.memory', !!(performance && performance.memory)],
+        ['OffscreenCanvas', typeof OffscreenCanvas !== 'undefined'],
+        ['createImageBitmap', typeof createImageBitmap !== 'undefined']
+      ];
+
+      log('');
+      log('[*] Feature surface:', 'info');
+      checks.forEach(([name, present]) => {
+        if (present) log('  [+] ' + name + ' present', 'ok');
+        else log('  [-] ' + name + ' missing', 'fail');
+      });
+
+      // Memory info if available
+      if (performance && performance.memory) {
+        log('');
+        log('[*] performance.memory:', 'info');
+        log('  jsHeapSizeLimit : ' + performance.memory.jsHeapSizeLimit, 'ok');
+        log('  totalJSHeapSize : ' + performance.memory.totalJSHeapSize, 'ok');
+        log('  usedJSHeapSize  : ' + performance.memory.usedJSHeapSize, 'ok');
       }
-      console.log(msg);
-    };
-    log('Index loaded');
+
+      // Simple ArrayBuffer ceiling probe (non-destructive)
+      log('');
+      log('[*] Quick ArrayBuffer ceiling probe...', 'info');
+      let maxOk = 0;
+      const sizes = [16, 32, 64, 128, 256, 512];
+      for (const mb of sizes) {
+        try {
+          const b = new ArrayBuffer(mb * 1024 * 1024);
+          const v = new Uint8Array(b);
+          v[0] = 1; v[v.length-1] = 2;
+          maxOk = mb;
+          log('  [+] ' + mb + ' MB OK', 'ok');
+        } catch (e) {
+          log('  [-] ' + mb + ' MB FAIL -> ' + e.message, 'fail');
+          break;
+        }
+      }
+      log('[*] Highest successful allocation this run: ' + maxOk + ' MB', maxOk ? 'ok' : 'fail');
+
+      log('');
+      log('[*] Scan complete. No public 14.22 chain known.', 'warn');
+      log('[*] Watch for freezes / KPs while running deeper probes.', 'warn');
+      log('[*] Report real findings via Sony HackerOne.', 'dim');
+    }
+
+    // Auto-run a light banner on load
+    log('[*] Y2JB-style probe host loaded', 'ok');
+    log('[*] Firmware target: 14.22 (Slim + disc)', 'dim');
+    log('[*] Select a probe or press [6] Quick Scan', 'info');
   </script>
 </body>
 </html>
