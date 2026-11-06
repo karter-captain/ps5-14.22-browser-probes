@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>TypedArray / ArrayBuffer Edge Cases</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
+    pre { background: #161b22; padding: 16px; border-radius: 8px; overflow: auto; font-size: 0.85rem; }
+    button { background: #238636; color: white; border: none; padding: 10px 16px; border-radius: 6px; margin: 4px; cursor: pointer; }
+    a { color: #58a6ff; }
+  </style>
+</head>
+<body>
+  <p><a href="index.html">&larr; Back</a></p>
+  <h1>TypedArray / ArrayBuffer Edge Cases</h1>
+  <button onclick="run()">Run Edge Tests</button>
+  <pre id="out"></pre>
+
+  <script>
+    const out = document.getElementById('out');
+    function log(s) { out.textContent += s + '\n'; }
+
+    function run() {
+      out.textContent = '';
+      log('=== TypedArray / ArrayBuffer edge probes ===\n');
+
+      // 1. Maximum practical ArrayBuffer
+      try {
+        const sizes = [1, 16, 64, 128, 256, 512, 1024, 1536, 2048];
+        for (const mb of sizes) {
+          try {
+            const b = new ArrayBuffer(mb * 1024 * 1024);
+            log('ArrayBuffer(' + mb + ' MB) OK');
+          } catch (e) {
+            log('ArrayBuffer(' + mb + ' MB) FAIL: ' + e.message);
+            break;
+          }
+        }
+      } catch (e) { log('size loop error: ' + e); }
+
+      // 2. Detach / transfer behavior
+      log('\n--- transfer / detach ---');
+      try {
+        const ab = new ArrayBuffer(1024);
+        const u8 = new Uint8Array(ab);
+        u8[0] = 42;
+        if (typeof ab.transfer === 'function') {
+          const transferred = ab.transfer();
+          log('ab.transfer() exists, byteLength after: ' + ab.byteLength);
+          log('new buffer length: ' + transferred.byteLength);
+        } else {
+          log('ab.transfer() not present');
+        }
+        // structured clone detach attempt
+        try {
+          const ch = new MessageChannel();
+          ch.port1.postMessage(ab, [ab]);
+          log('postMessage transfer: original byteLength now ' + ab.byteLength);
+        } catch (e) {
+          log('postMessage transfer error: ' + e.message);
+        }
+      } catch (e) { log('transfer section: ' + e); }
+
+      // 3. Overlapping views
+      log('\n--- overlapping views ---');
+      try {
+        const ab = new ArrayBuffer(64);
+        const u8 = new Uint8Array(ab);
+        const u32 = new Uint32Array(ab);
+        u8[0] = 0x11; u8[1] = 0x22; u8[2] = 0x33; u8[3] = 0x44;
+        log('u32[0] after u8 writes: 0x' + u32[0].toString(16));
+      } catch (e) { log('overlap: ' + e); }
+
+      // 4. Very large TypedArray length
+      log('\n--- large length constructors ---');
+      try {
+        const lens = [0x7fffffff, 0x10000000, 0x4000000];
+        for (const len of lens) {
+          try {
+            const t = new Uint8Array(len);
+            log('new Uint8Array(' + len + ') OK, byteLength=' + t.byteLength);
+          } catch (e) {
+            log('new Uint8Array(' + len + ') FAIL: ' + e.message);
+          }
+        }
+      } catch (e) { log('large length: ' + e); }
+
+      log('\nDone.');
+    }
+  </script>
+</body>
+</html>

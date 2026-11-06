@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WebKit / Feature Sniff</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
+    pre { background: #161b22; padding: 16px; border-radius: 8px; overflow: auto; font-size: 0.85rem; }
+    a { color: #58a6ff; }
+  </style>
+</head>
+<body>
+  <p><a href="index.html">&larr; Back</a></p>
+  <h1>WebKit / UA / Feature Sniff</h1>
+  <pre id="out">Running...</pre>
+
+  <script>
+    const out = document.getElementById('out');
+    function line(s) { out.textContent += s + '\n'; }
+
+    try {
+      line('=== Navigator ===');
+      line('userAgent: ' + navigator.userAgent);
+      line('platform: ' + navigator.platform);
+      line('vendor: ' + navigator.vendor);
+      line('language: ' + navigator.language);
+      line('hardwareConcurrency: ' + navigator.hardwareConcurrency);
+      line('deviceMemory: ' + (navigator.deviceMemory || 'n/a'));
+      line('maxTouchPoints: ' + navigator.maxTouchPoints);
+
+      line('\n=== Screen / Window ===');
+      line('screen: ' + screen.width + 'x' + screen.height + ' @' + (window.devicePixelRatio || 1));
+      line('inner: ' + window.innerWidth + 'x' + window.innerHeight);
+
+      line('\n=== Feature Detection ===');
+      const features = {
+        'SharedArrayBuffer': typeof SharedArrayBuffer !== 'undefined',
+        'Atomics': typeof Atomics !== 'undefined',
+        'WebAssembly': typeof WebAssembly !== 'undefined',
+        'BigInt64Array': typeof BigInt64Array !== 'undefined',
+        'WebGL2': !!document.createElement('canvas').getContext('webgl2'),
+        'OffscreenCanvas': typeof OffscreenCanvas !== 'undefined',
+        'createImageBitmap': typeof createImageBitmap !== 'undefined',
+        'Performance.memory': !!(performance && performance.memory),
+        'crossOriginIsolated': window.crossOriginIsolated === true,
+        'isSecureContext': window.isSecureContext === true
+      };
+      Object.keys(features).forEach(k => line(k + ': ' + features[k]));
+
+      if (performance && performance.memory) {
+        line('\n=== performance.memory ===');
+        line('jsHeapSizeLimit: ' + performance.memory.jsHeapSizeLimit);
+        line('totalJSHeapSize: ' + performance.memory.totalJSHeapSize);
+        line('usedJSHeapSize: ' + performance.memory.usedJSHeapSize);
+      }
+
+      line('\n=== WebKit version guess (from UA) ===');
+      const m = navigator.userAgent.match(/AppleWebKit\/([\d.]+)/);
+      line(m ? m[0] : 'not found');
+
+      line('\nDone.');
+    } catch (e) {
+      line('ERROR: ' + e);
+    }
+  </script>
+</body>
+</html>

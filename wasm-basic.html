@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WebAssembly Basics</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
+    pre { background: #161b22; padding: 16px; border-radius: 8px; overflow: auto; font-size: 0.85rem; }
+    a { color: #58a6ff; }
+  </style>
+</head>
+<body>
+  <p><a href="index.html">&larr; Back</a></p>
+  <h1>WebAssembly Basics</h1>
+  <pre id="out">Running...</pre>
+
+  <script>
+    const out = document.getElementById('out');
+    function log(s) { out.textContent += s + '\n'; }
+
+    async function run() {
+      try {
+        if (typeof WebAssembly === 'undefined') {
+          log('WebAssembly not available');
+          return;
+        }
+        log('WebAssembly object present');
+
+        // Minimal valid WASM module (empty)
+        // (module)
+        const bytes = new Uint8Array([
+          0x00, 0x61, 0x73, 0x6d, // magic
+          0x01, 0x00, 0x00, 0x00  // version
+        ]);
+
+        const mod = await WebAssembly.compile(bytes);
+        log('compile(empty module) OK');
+
+        const inst = await WebAssembly.instantiate(mod);
+        log('instantiate OK');
+
+        // Memory growth test
+        if (WebAssembly.Memory) {
+          const mem = new WebAssembly.Memory({ initial: 1, maximum: 100 });
+          log('Memory initial pages: ' + mem.buffer.byteLength / 65536);
+          try {
+            const grown = mem.grow(10);
+            log('grow(10) returned old size: ' + grown + ', new pages: ' + mem.buffer.byteLength / 65536);
+          } catch (e) {
+            log('grow failed: ' + e.message);
+          }
+        }
+
+        log('\nDone.');
+      } catch (e) {
+        log('ERROR: ' + e);
+      }
+    }
+    run();
+  </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Notes</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; max-width: 720px; line-height: 1.6; }
+    a { color: #58a6ff; }
+    code { background: #161b22; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <p><a href="index.html">&larr; Back</a></p>
+  <h1>Notes for 14.22 testing</h1>
+
+  <h2>What this suite is</h2>
+  <p>Purely diagnostic pages. They do not contain any exploit chains. They exist so you can observe how the 14.22 browser behaves under common allocation patterns, feature checks, and edge cases that historically mattered for WebKit entry points.</p>
+
+  <h2>What to watch for</h2>
+  <ul>
+    <li>Unexpected browser freezes or black screens</li>
+    <li>Kernel panics (console restarts)</li>
+    <li>Differences in maximum ArrayBuffer size vs earlier firmwares</li>
+    <li>Missing or changed WebAssembly / SharedArrayBuffer behavior</li>
+    <li>Any contentDocument or postMessage differences inside sandboxed iframes</li>
+  </ul>
+
+  <h2>Logging tips</h2>
+  <ul>
+    <li>Keep a phone or second device filming the TV if the console locks up</li>
+    <li>Note exact timing of any crash relative to which button / allocation size you pressed</li>
+    <li>If you get a reproducible panic, write down the last successful log line</li>
+  </ul>
+
+  <h2>Responsible path</h2>
+  <p>If you discover something that looks like a real memory-corruption or sandbox-escape primitive, the current scene norm is to report it through Sony’s HackerOne program first. Public release usually follows after the fix is shipped.</p>
+
+  <h2>Disc drive note</h2>
+  <p>You have a disc drive, so BD-J remains a theoretical secondary surface. These browser pages will not exercise BD-J. That path needs different tooling (disc image + Java classpath tests).</p>
+
+  <p style="margin-top: 40px; color: #8b949e; font-size: 0.9rem;">Repo: karter-captain/ps5-14.22-browser-probes</p>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Allocation Pressure</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
+    pre { background: #161b22; padding: 16px; border-radius: 8px; overflow: auto; font-size: 0.85rem; max-height: 60vh; }
+    button { background: #238636; color: white; border: none; padding: 10px 16px; border-radius: 6px; margin: 4px; cursor: pointer; }
+    a { color: #58a6ff; }
+  </style>
+</head>
+<body>
+  <p><a href="index.html">&larr; Back</a></p>
+  <h1>Allocation Pressure Test</h1>
+  <p>Attempts progressive large allocations and records timing / failures.</p>
+  <button onclick="runTest(64)">64 MB steps</button>
+  <button onclick="runTest(128)">128 MB steps</button>
+  <button onclick="runTest(256)">256 MB steps</button>
+  <button onclick="clearLog()">Clear</button>
+  <pre id="out"></pre>
+
+  <script>
+    const out = document.getElementById('out');
+    function log(s) { out.textContent += s + '\n'; out.scrollTop = out.scrollHeight; }
+    function clearLog() { out.textContent = ''; }
+
+    async function runTest(stepMB) {
+      clearLog();
+      log('Starting allocation pressure, step = ' + stepMB + ' MB');
+      const buffers = [];
+      let total = 0;
+      const step = stepMB * 1024 * 1024;
+
+      for (let i = 0; i < 40; i++) {
+        const t0 = performance.now();
+        try {
+          const buf = new ArrayBuffer(step);
+          // touch a few pages so the allocation is real
+          const view = new Uint8Array(buf);
+          view[0] = 1;
+          view[view.length - 1] = 2;
+          buffers.push(buf);
+          total += stepMB;
+          const dt = (performance.now() - t0).toFixed(1);
+          log('[' + i + '] +' + stepMB + ' MB  total=' + total + ' MB  time=' + dt + ' ms');
+        } catch (e) {
+          log('[' + i + '] FAIL after ' + total + ' MB  → ' + e);
+          break;
+        }
+        // yield so the page stays responsive
+        await new Promise(r => setTimeout(r, 30));
+      }
+      log('Finished. Held buffers: ' + buffers.length);
+    }
+  </script>
+</body>
+</html>
