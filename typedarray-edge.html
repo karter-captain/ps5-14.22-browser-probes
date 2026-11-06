@@ -10,85 +10,164 @@
     a { color: #0af; text-decoration: none; }
     button {
       background: #050505; border: 1px solid #0a0; color: #0f0;
-      font-family: inherit; font-size: 13px; padding: 8px 14px; margin: 8px 0; cursor: pointer;
+      font-family: inherit; font-size: 13px; padding: 8px 14px; margin: 8px 6px 8px 0; cursor: pointer;
     }
     button:hover { border-color: #0f0; color: #fff; }
-    #out { flex: 1; overflow-y: auto; white-space: pre-wrap; background: #020202; border: 1px solid #030; padding: 10px; }
-    .ok { color: #0f0; } .fail { color: #f33; } .info { color: #0af; } .dim { color: #060; }
+    #out {
+      flex: 1; overflow-y: auto; white-space: pre-wrap;
+      background: #020202; border: 1px solid #030; padding: 10px;
+    }
+    .ok { color: #0f0; } .fail { color: #f33; } .info { color: #0af; } .dim { color: #060; } .warn { color: #fa0; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div><a href="index.html">&lt;&lt; BACK</a> &nbsp; TypedArray / ArrayBuffer Edge Cases</div>
-    <button onclick="run()">Run Edge Tests</button>
-    <div id="out"></div>
+
+    <div>
+      <button onclick="runSafe()">RUN SAFE (small steps)</button>
+      <button onclick="runViewsOnly()">VIEWS / TRANSFER ONLY</button>
+      <button onclick="clearLog()">Clear</button>
+    </div>
+
+    <div id="out">[*] Ready.\n[*] Use RUN SAFE first — it starts tiny and logs after every allocation so you see output before any OOM.\n</div>
   </div>
+
   <script>
     const out = document.getElementById('out');
+
     function log(s, cls) {
       const d = document.createElement('div');
       if (cls) d.className = cls;
       d.textContent = s;
       out.appendChild(d);
+      out.scrollTop = out.scrollHeight;
     }
-    function run() {
-      out.innerHTML = '';
-      log('=== TypedArray / ArrayBuffer edge probes ===', 'info');
+    function clearLog() { out.innerHTML = ''; }
 
-      log('\n--- size ceiling ---', 'info');
-      const sizes = [1, 16, 64, 128, 256, 512, 1024, 1536, 2048];
-      for (const mb of sizes) {
+    // yield so the browser can paint the log line before the next heavy alloc
+    function yieldToUI() {
+      return new Promise(r => setTimeout(r, 40));
+    }
+
+    async function runSafe() {
+      clearLog();
+      log('[*] SAFE progressive allocation starting...', 'info');
+      log('[*] Each line is written BEFORE the next alloc so you should see output', 'dim');
+      log('');
+
+      // start very small and climb slowly
+      const sizesMB = [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512];
+      let lastOk = 0;
+
+      for (const mb of sizesMB) {
+        log('[ ] trying ' + mb + ' MB ...', 'dim');
+        await yieldToUI();
+
         try {
           const b = new ArrayBuffer(mb * 1024 * 1024);
-          log('[+] ArrayBuffer(' + mb + ' MB) OK', 'ok');
+          // touch first + last byte so the pages are actually committed
+          const u8 = new Uint8Array(b);
+          u8[0] = 1;
+          u8[u8.length - 1] = 2;
+
+          lastOk = mb;
+          log('[+] ' + mb + ' MB OK', 'ok');
+          await yieldToUI();
         } catch (e) {
-          log('[-] ArrayBuffer(' + mb + ' MB) FAIL: ' + e.message, 'fail');
-          break;
+          log('[-] ' + mb + ' MB FAIL -> ' + (e && e.message ? e.message : e), 'fail');
+          log('[*] Highest successful allocation: ' + lastOk + ' MB', lastOk ? 'ok' : 'fail');
+          log('[*] Stopped. This is the ceiling on your 14.22.', 'warn');
+          return;
         }
       }
 
-      log('\n--- transfer / detach ---', 'info');
-      try {
-        const ab = new ArrayBuffer(1024);
-        const u8 = new Uint8Array(ab);
-        u8[0] = 42;
-        if (typeof ab.transfer === 'function') {
-          const t = ab.transfer();
-          log('[+] ab.transfer() exists, original byteLength now ' + ab.byteLength, 'ok');
-          log('    new buffer length: ' + t.byteLength, 'ok');
-        } else {
-          log('[-] ab.transfer() not present', 'fail');
-        }
-        try {
-          const ch = new MessageChannel();
-          ch.port1.postMessage(ab, [ab]);
-          log('[+] postMessage transfer: original byteLength now ' + ab.byteLength, 'ok');
-        } catch (e) {
-          log('[-] postMessage transfer: ' + e.message, 'fail');
-        }
-      } catch (e) { log('transfer section error: ' + e, 'fail'); }
+      log('');
+      log('[*] All planned sizes succeeded. Highest tested: ' + lastOk + ' MB', 'ok');
+      log('[*] You can try VIEWS / TRANSFER ONLY next (no big allocs).', 'info');
+    }
 
-      log('\n--- overlapping views ---', 'info');
+    async function runViewsOnly() {
+      clearLog();
+      log('[*] Views / transfer / overlap tests (no large allocations)', 'info');
+      log('');
+
+      // overlapping views
+      log('=== overlapping views ===', 'info');
       try {
         const ab = new ArrayBuffer(64);
         const u8 = new Uint8Array(ab);
         const u32 = new Uint32Array(ab);
-        u8[0]=0x11; u8[1]=0x22; u8[2]=0x33; u8[3]=0x44;
-        log('[+] u32[0] after u8 writes: 0x' + u32[0].toString(16), 'ok');
-      } catch (e) { log('overlap error: ' + e, 'fail'); }
+        u8[0] = 0x11; u8[1] = 0x22; u8[2] = 0x33; u8[3] = 0x44;
+        log('[+] u32[0] after u8 writes = 0x' + u32[0].toString(16), 'ok');
+      } catch (e) {
+        log('[-] overlap error: ' + e, 'fail');
+      }
+      await yieldToUI();
 
-      log('\n--- large length constructors ---', 'info');
-      const lens = [0x7fffffff, 0x10000000, 0x4000000];
-      for (const len of lens) {
-        try {
-          const t = new Uint8Array(len);
-          log('[+] new Uint8Array(' + len + ') OK, byteLength=' + t.byteLength, 'ok');
-        } catch (e) {
-          log('[-] new Uint8Array(' + len + ') FAIL: ' + e.message, 'fail');
+      // transfer / detach
+      log('');
+      log('=== transfer / detach ===', 'info');
+      try {
+        const ab = new ArrayBuffer(1024);
+        const u8 = new Uint8Array(ab);
+        u8[0] = 42;
+
+        if (typeof ab.transfer === 'function') {
+          const t = ab.transfer();
+          log('[+] ab.transfer() exists', 'ok');
+          log('    original byteLength now: ' + ab.byteLength, 'dim');
+          log('    new buffer byteLength: ' + t.byteLength, 'dim');
+        } else {
+          log('[-] ab.transfer() not present', 'fail');
         }
+
+        // structured-clone transfer attempt
+        try {
+          const ab2 = new ArrayBuffer(512);
+          const ch = new MessageChannel();
+          ch.port1.postMessage(ab2, [ab2]);
+          log('[+] postMessage transfer attempted, original byteLength now: ' + ab2.byteLength, 'ok');
+        } catch (e) {
+          log('[-] postMessage transfer: ' + e.message, 'fail');
+        }
+      } catch (e) {
+        log('[-] transfer section error: ' + e, 'fail');
+      }
+      await yieldToUI();
+
+      // BigInt64Array small test (we know it exists on 14.22)
+      log('');
+      log('=== BigInt64Array small ===', 'info');
+      try {
+        const a = new BigInt64Array(8);
+        a[0] = 0x123456789abcdefn;
+        a[1] = -1n;
+        log('[+] BigInt64Array write OK', 'ok');
+        log('    [0]=' + a[0].toString() + '  [1]=' + a[1].toString(), 'dim');
+      } catch (e) {
+        log('[-] BigInt64Array error: ' + e, 'fail');
       }
 
-      log('\nDone.', 'dim');
+      // Atomics on non-shared (expected reject)
+      log('');
+      log('=== Atomics on non-shared buffer ===', 'info');
+      try {
+        const buf = new ArrayBuffer(16);
+        const i32 = new Int32Array(buf);
+        i32[0] = 7;
+        try {
+          Atomics.add(i32, 0, 1);
+          log('[!] Atomics.add succeeded on non-shared (unexpected)', 'warn');
+        } catch (e) {
+          log('[+] Atomics correctly rejected non-shared: ' + e.name, 'ok');
+        }
+      } catch (e) {
+        log('[-] Atomics section: ' + e, 'fail');
+      }
+
+      log('');
+      log('[*] Views / transfer tests finished. No large allocations were made.', 'info');
     }
   </script>
 </body>
