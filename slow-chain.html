@@ -64,17 +64,17 @@
   <div class="wrap">
     <div>
       <a href="index.html">&lt;&lt; BACK</a>
-      &nbsp; SLOW PROGRESSIVE CHAIN — ramp like old reliability loaders
+      &nbsp; SLOW PROGRESSIVE CHAIN — stops before 384 MB ceiling
     </div>
 
     <div class="controls">
-      <button id="btnStart" onclick="startSlowChain()">START SLOW CHAIN</button>
+      <button id="btnStart" onclick="startSlowChain()">START SLOW CHAIN (safe)</button>
       <button id="btnStop" onclick="stopChain()" disabled>STOP</button>
       <button onclick="clearLog()">Clear</button>
     </div>
 
     <div id="status">idle</div>
-    <div id="log">[*] Slow progressive chain ready.\n[*] This ramps memory + remaining features stage-by-stage with delays,\n[*] similar to old loaders that slowly fed data until the chain stabilized.\n[*] It will NOT produce a jailbreak on 14.22 — it is a reliability / side-effect probe.\n</div>
+    <div id="log">[*] Slow progressive chain ready.\n[*] Ramp now stops at 320 MB so the full chain (ImageBitmap, console, retry loop)\n[*] can finish without the 384 MB OOM crash you hit earlier.\n</div>
   </div>
 
   <script>
@@ -84,7 +84,7 @@
     const btnStop = document.getElementById('btnStop');
 
     let running = false;
-    let held = [];          // keep some allocations alive across stages
+    let held = [];
     let stage = 0;
 
     function log(msg, cls) {
@@ -97,10 +97,7 @@
     }
     function clearLog() { logEl.innerHTML = ''; }
     function setStatus(s) { statusEl.textContent = s; }
-
-    function sleep(ms) {
-      return new Promise(r => setTimeout(r, ms));
-    }
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     function stopChain() {
       running = false;
@@ -119,13 +116,13 @@
       stage = 0;
 
       clearLog();
-      log('[*] ===== SLOW PROGRESSIVE CHAIN =====', 'hdr');
-      log('[*] Target: 14.22 | style: old slow-ramp loaders', 'dim');
+      log('[*] ===== SLOW PROGRESSIVE CHAIN (safe) =====', 'hdr');
+      log('[*] Target: 14.22 | ceiling avoided (stops at 320 MB)', 'dim');
       log('[*] Remaining primitives: Atomics, BigInt64Array, createImageBitmap, isSecureContext', 'dim');
       log('');
 
       try {
-        // ---------- STAGE 0 : environment ----------
+        // STAGE 0
         stage = 0;
         setStatus('stage 0 — environment');
         log('[STAGE 0] Environment check', 'stage');
@@ -134,10 +131,10 @@
         log('[+] Atomics: ' + (typeof Atomics !== 'undefined'), typeof Atomics !== 'undefined' ? 'ok' : 'fail');
         log('[+] BigInt64Array: ' + (typeof BigInt64Array !== 'undefined'), typeof BigInt64Array !== 'undefined' ? 'ok' : 'fail');
         log('[+] createImageBitmap: ' + (typeof createImageBitmap !== 'undefined'), typeof createImageBitmap !== 'undefined' ? 'ok' : 'fail');
-        await sleep(600);
+        await sleep(500);
         if (!running) return;
 
-        // ---------- STAGE 1 : tiny warm-up ----------
+        // STAGE 1
         stage = 1;
         setStatus('stage 1 — tiny warm-up');
         log('');
@@ -149,14 +146,14 @@
             const v = new Uint8Array(b);
             v[0] = 1; v[v.length-1] = 2;
             held.push(b);
-            log('  [+] ' + mb + ' MB held (total buffers: ' + held.length + ')', 'ok');
+            log('  [+] ' + mb + ' MB held (total: ' + held.length + ')', 'ok');
           } catch (e) {
             log('  [-] ' + mb + ' MB failed: ' + e.message, 'fail');
           }
-          await sleep(350);
+          await sleep(300);
         }
 
-        // ---------- STAGE 2 : BigInt64 views on held memory ----------
+        // STAGE 2
         stage = 2;
         setStatus('stage 2 — BigInt64 views');
         log('');
@@ -166,17 +163,17 @@
           if (!running) return;
           try {
             const view = new BigInt64Array(held[i]);
-            view[0] = BigInt(0x43484149 + i); // "CHAI" + i
+            view[0] = BigInt(0x43484149 + i);
             viewCount++;
             log('  [+] view on buffer ' + i + ' OK', 'ok');
           } catch (e) {
             log('  [-] view ' + i + ' failed: ' + e.message, 'fail');
           }
-          await sleep(200);
+          await sleep(180);
         }
         log('[*] BigInt64 views created: ' + viewCount, 'info');
 
-        // ---------- STAGE 3 : Atomics noise ----------
+        // STAGE 3
         stage = 3;
         setStatus('stage 3 — Atomics');
         log('');
@@ -195,44 +192,43 @@
         } catch (e) {
           log('  [-] Atomics section error: ' + e, 'fail');
         }
-        await sleep(500);
+        await sleep(400);
         if (!running) return;
 
-        // ---------- STAGE 4 : slow memory ramp toward known ceiling ----------
+        // STAGE 4 — safe ramp, stops at 320 MB (below known 384 crash point)
         stage = 4;
-        setStatus('stage 4 — slow ramp toward ceiling');
+        setStatus('stage 4 — safe ramp (max 320 MB)');
         log('');
-        log('[STAGE 4] Slow ramp (16 → 48 → 96 → 160 → 240 → 320 → 384 MB)', 'stage');
-        log('[*] Your earlier ceiling was ~384 MB. We stop at first failure.', 'dim');
+        log('[STAGE 4] Safe ramp: 16 → 48 → 96 → 160 → 240 → 320 MB', 'stage');
+        log('[*] Stops before 384 MB so the rest of the chain can finish.', 'dim');
 
-        const ramp = [16, 48, 96, 160, 240, 320, 384];
+        const ramp = [16, 48, 96, 160, 240, 320];
         for (const mb of ramp) {
           if (!running) return;
           log('  [ ] allocating ' + mb + ' MB ...', 'dim');
-          await sleep(80); // let the log paint
+          await sleep(60);
           try {
             const b = new ArrayBuffer(mb * 1024 * 1024);
             const v = new BigInt64Array(b);
             v[0] = 0xDEADBEEFn;
             v[v.length - 1] = 0xC0FFEEFn;
             held.push(b);
-            log('  [+] ' + mb + ' MB OK — held total ~' + held.length + ' buffers', 'ok');
+            log('  [+] ' + mb + ' MB OK — held total ' + held.length + ' buffers', 'ok');
           } catch (e) {
             log('  [-] ' + mb + ' MB FAIL: ' + e.message, 'fail');
-            log('[*] Ramp stopped. Last successful stage allocation before this failed.', 'warn');
+            log('[*] Ramp stopped early.', 'warn');
             break;
           }
-          // longer pause between bigger allocs, like old slow loaders
-          await sleep(600 + mb * 2);
+          await sleep(500 + mb * 2);
         }
 
         if (!running) return;
 
-        // ---------- STAGE 5 : createImageBitmap side-effect ----------
+        // STAGE 5
         stage = 5;
-        setStatus('stage 5 — ImageBitmap side-effect');
+        setStatus('stage 5 — ImageBitmap');
         log('');
-        log('[STAGE 5] createImageBitmap visual / side-effect', 'stage');
+        log('[STAGE 5] createImageBitmap side-effect', 'stage');
         try {
           const c = document.createElement('canvas');
           c.width = 128; c.height = 32;
@@ -242,7 +238,6 @@
           ctx.fillStyle = '#0f0';
           ctx.font = '14px monospace';
           ctx.fillText('SLOW-CHAIN OK', 6, 20);
-
           const bmp = await createImageBitmap(c);
           log('  [+] createImageBitmap OK (' + bmp.width + 'x' + bmp.height + ')', 'ok');
           if (bmp.close) bmp.close();
@@ -252,7 +247,7 @@
         await sleep(400);
         if (!running) return;
 
-        // ---------- STAGE 6 : console / error surface ----------
+        // STAGE 6
         stage = 6;
         setStatus('stage 6 — console surface');
         log('');
@@ -272,23 +267,21 @@
         }
         await sleep(400);
 
-        // ---------- STAGE 7 : hold + soft retry loop ----------
+        // STAGE 7
         stage = 7;
         setStatus('stage 7 — soft retry loop');
         log('');
         log('[STAGE 7] Soft retry loop (re-touch held memory + small new allocs)', 'stage');
-        log('[*] This mimics old loaders that kept gently re-trying until stable.', 'dim');
+        log('[*] Mimics old loaders that kept gently re-trying until stable.', 'dim');
 
         for (let round = 1; round <= 5 && running; round++) {
           log('  -- retry round ' + round + '/5 --', 'info');
-          // re-touch existing
           for (let i = 0; i < Math.min(held.length, 8); i++) {
             try {
               const v = new Uint8Array(held[i]);
               v[0] = (v[0] + 1) & 0xff;
             } catch (e) {}
           }
-          // one small fresh alloc
           try {
             const b = new ArrayBuffer(2 * 1024 * 1024);
             const v = new BigInt64Array(b);
@@ -298,16 +291,15 @@
           } catch (e) {
             log('    [-] round ' + round + ' extra alloc failed: ' + e.message, 'fail');
           }
-          await sleep(700);
+          await sleep(600);
         }
 
-        // ---------- done ----------
         log('');
-        log('[*] ===== SLOW CHAIN FINISHED =====', 'hdr');
+        log('[*] ===== SLOW CHAIN FINISHED CLEANLY =====', 'hdr');
         log('[*] Held buffers at end: ' + held.length, 'info');
-        log('[*] Watch for any debug overlay, freeze, or unexpected UI during the run.', 'warn');
-        log('[*] Nothing here is a jailbreak — pure progressive pressure + side-effect probe.', 'dim');
-        setStatus('finished — held ' + held.length + ' buffers');
+        log('[*] No 384 MB allocation was attempted — crash should be avoided.', 'ok');
+        log('[*] Watch for any debug overlay or unexpected UI during the run.', 'warn');
+        setStatus('finished cleanly — held ' + held.length + ' buffers');
 
       } catch (e) {
         log('[!] Uncaught error in chain: ' + e, 'fail');
