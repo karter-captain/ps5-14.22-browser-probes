@@ -28,20 +28,9 @@
       padding-bottom: 8px;
       margin-bottom: 10px;
     }
-    .header h1 {
-      color: #0f0;
-      font-size: 17px;
-      letter-spacing: 1px;
-    }
-    .header .sub {
-      color: #0a0;
-      font-size: 12px;
-      margin-top: 2px;
-    }
-    .menu {
-      flex: 0 0 auto;
-      margin-bottom: 8px;
-    }
+    .header h1 { color: #0f0; font-size: 17px; letter-spacing: 1px; }
+    .header .sub { color: #0a0; font-size: 12px; margin-top: 2px; }
+    .menu { flex: 0 0 auto; margin-bottom: 8px; }
     .btn {
       display: inline-block;
       background: #050505;
@@ -54,24 +43,10 @@
       cursor: pointer;
       text-decoration: none;
     }
-    .btn:hover, .btn:focus {
-      background: #0a0a0a;
-      border-color: #0f0;
-      color: #fff;
-    }
+    .btn:hover, .btn:focus { background: #0a0a0a; border-color: #0f0; color: #fff; }
     .btn span { color: #0a0; margin-right: 6px; }
-    .results {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-    .results-title {
-      color: #0f0;
-      font-size: 13px;
-      margin-bottom: 4px;
-      letter-spacing: 1px;
-    }
+    .results { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .results-title { color: #0f0; font-size: 13px; margin-bottom: 4px; letter-spacing: 1px; }
     #log {
       flex: 1;
       background: #020202;
@@ -82,35 +57,30 @@
       font-size: 12.5px;
       color: #0c0;
     }
-    .ok { color: #0f0; }
-    .fail { color: #f33; }
-    .info { color: #0af; }
-    .warn { color: #fa0; }
-    .dim { color: #060; }
-    .hdr { color: #0f0; }
+    .ok { color: #0f0; } .fail { color: #f33; } .info { color: #0af; }
+    .warn { color: #fa0; } .dim { color: #060; } .hdr { color: #0f0; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="header">
       <h1>Y2JB-STYLE BROWSER PROBE // FW 14.22</h1>
-      <div class="sub">Slim + disc &nbsp;|&nbsp; diagnostic only &nbsp;|&nbsp; baseline from live 14.22 results</div>
+      <div class="sub">Slim + disc &nbsp;|&nbsp; diagnostic only &nbsp;|&nbsp; Atomics anomaly under test</div>
     </div>
 
     <div class="menu">
-      <a class="btn" href="#" onclick="runQuickScan(); return false;"><span>[1]</span> QUICK SCAN</a>
-      <a class="btn" href="#" onclick="runDeepRemaining(); return false;"><span>[2]</span> DEEP CHECK</a>
+      <a class="btn" href="atomics-probe.html"><span>[1]</span> ATOMICS PROBE</a>
+      <a class="btn" href="slow-chain.html"><span>[2]</span> SLOW CHAIN</a>
       <a class="btn" href="chain.html"><span>[3]</span> CHAIN</a>
-      <a class="btn" href="slow-chain.html"><span>[4]</span> SLOW CHAIN</a>
-      <a class="btn" href="webkit-sniff.html"><span>[5]</span> Full Sniff</a>
-      <a class="btn" href="alloc-pressure.html"><span>[6]</span> Alloc Pressure</a>
-      <a class="btn" href="typedarray-edge.html"><span>[7]</span> TypedArray Edge</a>
-      <a class="btn" href="notes.html"><span>[8]</span> Notes</a>
+      <a class="btn" href="typedarray-edge.html"><span>[4]</span> TypedArray Edge</a>
+      <a class="btn" href="alloc-pressure.html"><span>[5]</span> Alloc Pressure</a>
+      <a class="btn" href="webkit-sniff.html"><span>[6]</span> Full Sniff</a>
+      <a class="btn" href="notes.html"><span>[7]</span> Notes</a>
     </div>
 
     <div class="results">
       <div class="results-title">// RESULTS</div>
-      <div id="log">[*] Ready.\n[*] [4] SLOW CHAIN = progressive ramp like old reliability loaders.\n</div>
+      <div id="log">[*] Ready.\n[*] [1] ATOMICS PROBE isolates the non-shared Atomics.add success you saw.\n[*] Spec requires TypeError — success is the interesting case.\n</div>
     </div>
   </div>
 
@@ -121,52 +91,9 @@
       if (cls) line.className = cls;
       line.textContent = msg;
       logEl.appendChild(line);
-      logEl.scrollTop = logEl.scrollHeight;
     }
-    function clearLog() { logEl.innerHTML = ''; }
-
-    const BASELINE_14_22 = {
-      'Atomics': true, 'BigInt64Array': true, 'createImageBitmap': true, 'isSecureContext': true,
-      'WebAssembly': false, 'SharedArrayBuffer': false, 'performance.memory': false,
-      'OffscreenCanvas': false, 'crossOriginIsolated': false
-    };
-
-    function detect() {
-      return {
-        'Atomics': typeof Atomics !== 'undefined',
-        'BigInt64Array': typeof BigInt64Array !== 'undefined',
-        'createImageBitmap': typeof createImageBitmap !== 'undefined',
-        'isSecureContext': window.isSecureContext === true,
-        'WebAssembly': typeof WebAssembly !== 'undefined',
-        'SharedArrayBuffer': typeof SharedArrayBuffer !== 'undefined',
-        'performance.memory': !!(performance && performance.memory),
-        'OffscreenCanvas': typeof OffscreenCanvas !== 'undefined',
-        'crossOriginIsolated': window.crossOriginIsolated === true
-      };
-    }
-
-    function runQuickScan() {
-      clearLog();
-      log('[*] Quick Scan + 14.22 Baseline', 'info');
-      const current = detect();
-      log('-- Still present --', 'info');
-      ['Atomics','BigInt64Array','createImageBitmap','isSecureContext'].forEach(n => {
-        log((current[n]?'  [+] ':'  [-] ') + n, current[n]?'ok':'fail');
-      });
-      log('-- Missing --', 'info');
-      ['WebAssembly','SharedArrayBuffer','performance.memory','OffscreenCanvas','crossOriginIsolated'].forEach(n => {
-        log((!current[n]?'  [-] ':'  [!] ') + n, !current[n]?'fail':'warn');
-      });
-    }
-
-    function runDeepRemaining() {
-      clearLog();
-      log('[*] Deep check on remaining features', 'info');
-      log('Open [4] SLOW CHAIN for the progressive ramp style.', 'dim');
-    }
-
     log('[*] Probe host ready', 'ok');
-    log('[*] [4] SLOW CHAIN ramps like old loaders that slowly fed data until stable', 'info');
+    log('[*] Go to [1] ATOMICS PROBE and run 5× or 10× for stability', 'info');
   </script>
 </body>
 </html>

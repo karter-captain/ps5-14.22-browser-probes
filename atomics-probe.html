@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atomics Probe // 14.22</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: #000;
+      color: #0f0;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 12px;
+    }
+    a { color: #0af; text-decoration: none; }
+    a:hover { color: #fff; }
+    .controls { margin: 10px 0; }
+    button {
+      background: #050505;
+      border: 1px solid #0a0;
+      color: #0f0;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 14px;
+      margin: 0 6px 6px 0;
+      cursor: pointer;
+    }
+    button:hover { border-color: #0f0; color: #fff; }
+    #log {
+      flex: 1;
+      background: #020202;
+      border: 1px solid #030;
+      padding: 10px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 12.5px;
+    }
+    .ok { color: #0f0; }
+    .fail { color: #f33; }
+    .info { color: #0af; }
+    .warn { color: #fa0; }
+    .dim { color: #060; }
+    .hdr { color: #0f0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div>
+      <a href="index.html">&lt;&lt; BACK</a>
+      &nbsp; ATOMICS PROBE — non-shared buffer behavior on 14.22
+    </div>
+
+    <div class="controls">
+      <button onclick="runOnce()">RUN ONCE</button>
+      <button onclick="runRepeat(5)">RUN 5× (stability)</button>
+      <button onclick="runRepeat(10)">RUN 10×</button>
+      <button onclick="clearLog()">Clear</button>
+    </div>
+
+    <div id="log">[*] Atomics probe ready.\n[*] Spec says Atomics.* on non-SharedArrayBuffer must throw TypeError.\n[*] You previously saw Atomics.add succeed — this isolates that.\n</div>
+  </div>
+
+  <script>
+    const logEl = document.getElementById('log');
+
+    function log(msg, cls) {
+      const line = document.createElement('div');
+      if (cls) line.className = cls;
+      line.textContent = msg;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+      try { console.log(msg); } catch(e){}
+    }
+    function clearLog() { logEl.innerHTML = ''; }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // List of Atomics ops to try on a non-shared Int32Array
+    // Each entry: [name, fn]
+    // fn receives (typedArray, index) and should perform the op
+    function getOps(i32) {
+      return [
+        ['Atomics.load',          () => Atomics.load(i32, 0)],
+        ['Atomics.store',         () => Atomics.store(i32, 0, 0x41)],
+        ['Atomics.add',           () => Atomics.add(i32, 0, 1)],
+        ['Atomics.sub',           () => Atomics.sub(i32, 0, 1)],
+        ['Atomics.and',           () => Atomics.and(i32, 0, 0xff)],
+        ['Atomics.or',            () => Atomics.or(i32, 0, 0x10)],
+        ['Atomics.xor',           () => Atomics.xor(i32, 0, 0x20)],
+        ['Atomics.exchange',      () => Atomics.exchange(i32, 0, 0x99)],
+        ['Atomics.compareExchange', () => Atomics.compareExchange(i32, 0, 0x99, 0x77)],
+        ['Atomics.isLockFree(4)', () => Atomics.isLockFree(4)],
+        ['Atomics.isLockFree(8)', () => Atomics.isLockFree(8)],
+      ];
+    }
+
+    function testOneRun(runId) {
+      log('');
+      log('=== RUN ' + runId + ' ===', 'hdr');
+
+      if (typeof Atomics === 'undefined') {
+        log('[-] Atomics object missing entirely', 'fail');
+        return { unexpectedSuccess: [], expectedThrow: [], other: [] };
+      }
+
+      // Fresh non-shared buffer every run
+      const ab = new ArrayBuffer(64);
+      const i32 = new Int32Array(ab);
+      i32[0] = 0x10;
+
+      log('[*] buffer = normal ArrayBuffer (NOT SharedArrayBuffer)', 'dim');
+      log('[*] i32[0] initial = ' + i32[0], 'dim');
+
+      const unexpectedSuccess = [];
+      const expectedThrow = [];
+      const other = [];
+
+      const ops = getOps(i32);
+
+      for (const [name, fn] of ops) {
+        try {
+          const result = fn();
+          // isLockFree is allowed on any size and does not need SAB
+          if (name.startsWith('Atomics.isLockFree')) {
+            log('  [+] ' + name + ' -> ' + result + '  (allowed by spec)', 'ok');
+            other.push(name);
+          } else {
+            // SUCCESS on non-shared is the unexpected case
+            log('  [!] ' + name + ' SUCCEEDED (unexpected)  result=' + result, 'warn');
+            log('      i32[0] after = ' + i32[0], 'dim');
+            unexpectedSuccess.push(name);
+          }
+        } catch (e) {
+          const ename = e && e.name ? e.name : 'Error';
+          const msg = e && e.message ? e.message : String(e);
+          // TypeError is the expected outcome for non-shared
+          if (ename === 'TypeError') {
+            log('  [+] ' + name + ' threw TypeError (expected)', 'ok');
+            expectedThrow.push(name);
+          } else {
+            log('  [?] ' + name + ' threw ' + ename + ': ' + msg, 'info');
+            other.push(name + ' (' + ename + ')');
+          }
+        }
+      }
+
+      log('[*] Run ' + runId + ' summary:', 'info');
+      log('    unexpected success: ' + (unexpectedSuccess.length ? unexpectedSuccess.join(', ') : 'none'),
+          unexpectedSuccess.length ? 'warn' : 'ok');
+      log('    expected TypeError:  ' + (expectedThrow.length ? expectedThrow.join(', ') : 'none'), 'dim');
+
+      return { unexpectedSuccess, expectedThrow, other };
+    }
+
+    async function runOnce() {
+      clearLog();
+      log('[*] Single Atomics probe on non-shared buffer', 'info');
+      log('[*] Spec: these must throw TypeError when the buffer is not shared', 'dim');
+      testOneRun(1);
+      log('');
+      log('[*] Done.', 'info');
+    }
+
+    async function runRepeat(n) {
+      clearLog();
+      log('[*] Repeating Atomics probe ' + n + ' times (stability check)', 'info');
+      log('[*] Spec: Atomics.* on non-shared must throw TypeError', 'dim');
+
+      const allUnexpected = {};
+
+      for (let i = 1; i <= n; i++) {
+        const result = testOneRun(i);
+        result.unexpectedSuccess.forEach(name => {
+          allUnexpected[name] = (allUnexpected[name] || 0) + 1;
+        });
+        await sleep(120);
+      }
+
+      log('');
+      log('=== STABILITY SUMMARY (' + n + ' runs) ===', 'hdr');
+      const keys = Object.keys(allUnexpected);
+      if (keys.length === 0) {
+        log('[+] No unexpected successes across all runs (spec-compliant)', 'ok');
+      } else {
+        log('[!] Ops that succeeded on non-shared buffer:', 'warn');
+        keys.forEach(k => {
+          log('    ' + k + '  ->  succeeded ' + allUnexpected[k] + '/' + n + ' times', 'warn');
+        });
+        log('[*] This is the interesting behavior. Note which ops and how often.', 'info');
+      }
+      log('[*] Finished.', 'info');
+    }
+  </script>
+</body>
+</html>
